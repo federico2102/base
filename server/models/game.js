@@ -14,10 +14,10 @@ function startGame(session) { // Accept session as an argument
 
     // Assign hands to the specific session
     session.players.forEach((player, index) => {
-        session.players[index].hand = playerHands[`player${index + 1}`]; // Assign hand
+        player.hand = playerHands[`player${index + 1}`]; // Assign hand
     });
 
-    console.log("Game State after starting the game:", session); // Debugging log
+    console.log("Game State after starting the game:", session.players[0].hand); // Debugging log
 }
 
 module.exports = { startGame, gameState };

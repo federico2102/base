@@ -57,11 +57,19 @@ io.on('connection', (socket) => {
     // Handle starting the game
     socket.on('startGame', (sessionId) => {
         if (sessions[sessionId]) {
-            const numPlayers = sessions[sessionId].players.length; // Get the number of players in the session
-            startGame(numPlayers); // Call the game logic to start the game and deal cards
+            // const numPlayers = sessions[sessionId].players.length; // Get the number of players in the session
+            startGame(sessions[sessionId]); // Call the game logic to start the game and deal cards
+
+       // Emit each player's cards so they see only their own.
+       sessions[sessionId].players.forEach(player => {
+        const playerCards = player.hand; // Get player's hand stored in session
+        socket.to(player.id).emit('yourCards', playerCards); // Emit each player's cards
+        });
 
             // Emit the game start notification to everyone in the session
-            io.to(sessionId).emit('gameStarted', { players: sessions[sessionId].players });
+            io.to(sessionId).emit('gameStarted', { players: sessions[sessionId].players }); // Notify all players
+        } else {
+        socket.emit('error', { message: 'Invalid session to start the game!' });
         }
     });
 
