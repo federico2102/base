@@ -71,7 +71,7 @@ io.on('connection', (socket) => {
         // Emit the game start notification to everyone in the session
         io.to(sessionId).emit('gameStarted', { players: sessions[sessionId].players }); // Notify all players
         } else {
-        socket.emit('error', { message: 'Invalid session to start the game!' });
+        io.emit('error', { message: 'Invalid session to start the game!' });
         }
     });
 
