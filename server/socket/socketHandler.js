@@ -1,4 +1,4 @@
-const { startGame } = require('../models/game');
+const { startGame, getRandomPlayer } = require('../models/game');
 
 const sessions = {}; // Store session data
 
@@ -10,7 +10,7 @@ const socketHandler = (io) => {
             const sessionId = Math.random().toString(36).substring(2, 8);
             sessions[sessionId] = {
                 players: [{ name: playerName, id: socket.id }],
-                gameState: {}, 
+                gameState: {turnName: null}, 
             };
 
             socket.join(sessionId);
@@ -31,6 +31,13 @@ const socketHandler = (io) => {
 
         socket.on('startGame', (sessionId) => {
             if (sessions[sessionId]) {
+                const whoStarts = getRandomPlayer(sessions[sessionId].players) //which player starts the game
+                io.to(whoStarts.id).emit('yourTurn');
+
+                sessions[sessionId].gameState = whoStarts.name;
+                io.to(sessionId).emit('whoStarts', {whoStarts: whoStarts});
+                console.log('who starts: ', whoStarts.name);
+
                 startGame(sessions[sessionId]);
 
                 sessions[sessionId].players.forEach(player => {

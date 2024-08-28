@@ -18,5 +18,14 @@ function startGame(session) {  // Accept session as an argument
     console.log("Game State after starting the game:", session); // Debug log to check player hands
 }
 
+function getRandomPlayer(players) {
+    if (players.length === 0) {
+        return null; // Return null if the list is empty
+    }
+    const randomIndex = Math.floor(Math.random() * players.length); // Generate a random index
+    return players[randomIndex]; // Return the player at that index
+}
+
+
 // Removed duplicate dealCards function since it's defined in deck.js
-module.exports = { startGame, gameState };
+module.exports = { startGame, gameState, getRandomPlayer };
