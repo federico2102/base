@@ -1,3 +1,4 @@
+// client/src/components/PlayerWaiting.js
 import React from 'react';
 
 const PlayerWaiting = ({ players, adminName }) => (

@@ -1,73 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
+import GameLobby from './components/GameLobby';
+import GameScreen from './components/GameScreen';
 
 const socket = io('http://localhost:4000');
 
 const App = () => {
-    const [sessionId, setSessionId] = useState('');
-    const [players, setPlayers] = useState([]);
-    const [playerName, setPlayerName] = useState('');
+    const [gameStarted, setGameStarted] = useState(false);
+    const [playerHand, setPlayerHand] = useState([]);
+    const [turnName, setTurnName] = useState('');
 
     useEffect(() => {
-        socket.on('sessionCreated', ({ sessionId }) => {
-            setSessionId(sessionId);
-            alert(`Game created! Session ID: ${sessionId}`);
-        });
-
-        socket.on('playerListUpdated', (players) => {
-            setPlayers(players);
-        });
-
-        socket.on('addedToGame', ({ players }) => {
-            setPlayers(players);
-        });
-
-        socket.on('error', (error) => {
-            console.error('Socket error:', error);
-            alert(error.message);
+        socket.on('gameStarted', ({ playerHand, turnName }) => {
+            setPlayerHand(playerHand);  // Set the player's hand
+            setTurnName(turnName);      // Set the current player's turn name
+            setGameStarted(true);       // Set the game as started
         });
 
         return () => {
-            socket.off();
+            socket.off('gameStarted');
         };
     }, []);
 
-    const handleCreateGame = () => {
-        if (playerName) {
-            socket.emit('createGame', playerName);
-        } else {
-            alert('Please enter your name.');
-        }
-    };
-
-    const handleJoinGame = () => {
-        const code = prompt("Enter the game code:");
-        if (code) {
-            socket.emit('joinGame', { playerName, code });
-        }
-    };
-
     return (
         <div>
-            <h1>Multiplayer Card Game</h1>
-            <input
-                type="text"
-                placeholder="Enter your name"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-            />
-            <button onClick={handleCreateGame}>Create Game</button>
-            <button onClick={handleJoinGame}>Join Game</button>
-
-            {sessionId && (
-                <div>
-                    <h2>Waiting for players...</h2>
-                    <ul>
-                        {players.map(player => (
-                            <li key={player.id}>{player.name}</li>
-                        ))}
-                    </ul>
-                </div>
+            {gameStarted ? (
+                <GameScreen playerHand={playerHand} turnName={turnName} />
+            ) : (
+                <GameLobby socket={socket} />
             )}
         </div>
     );
