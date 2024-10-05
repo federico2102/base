@@ -3,17 +3,20 @@ import io from 'socket.io-client';
 import GameLobby from './components/GameLobby';
 import GameScreen from './components/GameScreen';
 
-const socket = io('http://localhost:4000');
+const socket = io('http://localhost:4000'); // Ensure this points to your server
 
 const App = () => {
     const [gameStarted, setGameStarted] = useState(false);
-    const [playerHand, setPlayerHand] = useState([]);
-    const [turnName, setTurnName] = useState('');
+    const [playerHand, setPlayerHand] = useState([]);  // To store player's hand
+    const [turnName, setTurnName] = useState('');      // To store the current player's turn name
+    const [myName, setMyName] = useState('');          // Store the player's own name (from GameLobby)
 
     useEffect(() => {
+        // Listen for when the game starts
         socket.on('gameStarted', ({ playerHand, turnName }) => {
-            setPlayerHand(playerHand);  // Set the player's hand
-            setTurnName(turnName);      // Set the current player's turn name
+            // console.log('Game started with hand:', playerHand, 'and turn for:', turnName);  // Debugging log
+            setPlayerHand(playerHand);  // Set the player's hand from the server
+            setTurnName(turnName);      // Set the current player's turn name from the server
             setGameStarted(true);       // Set the game as started
         });
 
@@ -25,9 +28,14 @@ const App = () => {
     return (
         <div>
             {gameStarted ? (
-                <GameScreen playerHand={playerHand} turnName={turnName} />
+                <GameScreen
+                    playerHand={playerHand}
+                    turnName={turnName}
+                    myName={myName}  // Pass the player's own name to GameScreen
+                    socket={socket}
+                />
             ) : (
-                <GameLobby socket={socket} />
+                <GameLobby socket={socket} setMyName={setMyName} />  // Pass setMyName to GameLobby to capture the player's name
             )}
         </div>
     );

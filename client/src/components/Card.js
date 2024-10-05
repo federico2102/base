@@ -8,17 +8,16 @@ const suitSymbols = {
     C: '♣'  // Clubs
 };
 
-const Card = ({ value }) => {
+const Card = ({ value, onClick }) => {
     if (!value) return null;
 
     const rank = value.slice(0, -1);  // Get the rank (e.g., "2" from "2H")
     const suit = value.slice(-1);     // Get the suit (e.g., "H" from "2H")
 
-    // Define the color based on the suit
     const isRed = suit === 'H' || suit === 'D';
 
     return (
-        <div className="card">
+        <div className="card" onClick={onClick} style={{ cursor: 'pointer' }}>
             <span>{rank}</span>
             <span className="card-suit" style={{ color: isRed ? 'red' : 'black' }}>
                 {suitSymbols[suit]}

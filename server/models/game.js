@@ -19,14 +19,11 @@ function startGame(session, currentHand) {
     });
 
     // Initialize currentTurnIndex if not already set
-    if (!session.gameState.currentTurnIndex || session.gameState.currentTurnIndex >= numPlayers) {
-        session.gameState.currentTurnIndex = 0;
-    }
+    session.gameState.currentTurnIndex = 0;
 
-    // Set the turn to the next player based on the circular logic
+    // Set the turn to the first player
     session.gameState.turnName = session.players[session.gameState.currentTurnIndex].name;
 }
-
 
 function getRandomPlayer(players) {
     const randomIndex = Math.floor(Math.random() * players.length);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const GameLobby = ({ socket }) => {
+const GameLobby = ({ socket, setMyName }) => {
     const [playerName, setPlayerName] = useState('');
     const [sessionId, setSessionId] = useState('');
     const [players, setPlayers] = useState([]);
@@ -14,6 +14,7 @@ const GameLobby = ({ socket }) => {
 
     const handleCreateGame = () => {
         if (playerName) {
+            setMyName(playerName);
             socket.emit('createGame', playerName, numHands);
             setIsAdmin(true);
             setGameCreated(true);
@@ -24,6 +25,7 @@ const GameLobby = ({ socket }) => {
 
     const handleJoinGame = () => {
         if (playerName && sessionId) {
+            setMyName(playerName);
             socket.emit('joinGame', { playerName, code: sessionId });
         } else {
             alert('Please enter a valid name and session code.');
