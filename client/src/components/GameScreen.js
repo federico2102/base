@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
-import io from 'socket.io-client';
 
 const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, socket }) => {
     const [selectedCard, setSelectedCard] = useState(null);
@@ -11,6 +10,8 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
         currentHand: currentHand || 1
     });
     const [boardCards, setBoardCards] = useState([]);
+    const [roundComplete, setRoundComplete] = useState(false);
+    const [winner, setWinner] = useState(null);
 
     useEffect(() => {
         const isTurn = turnName === myName;
@@ -46,16 +47,32 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             }));
         });
 
-        // Clear the board when the round is finished
-        socket.on('clearBoard', ({ winningPlayer }) => {
+        // Round completed - all players must click 'Continue'
+        socket.on('roundComplete', ({ playedCards, winningPlayer }) => {
+            setBoardCards(playedCards); // Show all played cards on the board
+            setWinner(winningPlayer);  // Display the winner of the round
+            setRoundComplete(true);    // Show 'Continue' button
+        });
+
+        // Clear the board and start the next round
+        socket.on('nextRound', ({ playerHand, turnName, currentHand }) => {
             setBoardCards([]); // Clear the board
+            setRoundComplete(false); // Hide 'Continue' button
+            setWinner(null);  // Reset winner display
+            setGameState({
+                playerHand,
+                turnName,
+                currentHand
+            });
+            setIsMyTurn(turnName === myName); // Set if it's the player's turn
         });
 
         return () => {
             socket.off('nextTurn');
             socket.off('cardPlayed');
             socket.off('handUpdated');
-            socket.off('clearBoard');
+            socket.off('roundComplete');
+            socket.off('nextRound');
         };
     }, [myName, turnName, playerHand, currentHand]);
 
@@ -64,6 +81,11 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             socket.emit('playCard', { sessionId, card: selectedCard, playerName: myName });
             setSelectedCard(null);
         }
+    };
+
+    // Emit 'continueToNextRound' event when player clicks 'Continue'
+    const handleContinue = () => {
+        socket.emit('continueToNextRound', sessionId);
     };
 
     return (
@@ -101,6 +123,13 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
                     ))}
                 </div>
             </div>
+
+            {roundComplete && (
+                <div>
+                    <h2>{winner} won the round!</h2>
+                    <button onClick={handleContinue}>Continue</button>
+                </div>
+            )}
         </div>
     );
 };
