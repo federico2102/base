@@ -8,10 +8,13 @@ const GameLobby = ({ socket }) => {
     const [adminName, setAdminName] = useState('');
     const [gameCreated, setGameCreated] = useState(false);  // Track if a game is created or joined
     const [errorMessage, setErrorMessage] = useState(null); // To show error message
+    const [numHands, setNumHands] = useState(1);  // Number of hands chosen by the admin
+    const [maxHands, setMaxHands] = useState(1);  // Number of hands (view-only for non-admin)
+
 
     const handleCreateGame = () => {
         if (playerName) {
-            socket.emit('createGame', playerName);
+            socket.emit('createGame', playerName, numHands);
             setIsAdmin(true);
             setGameCreated(true);
         } else {
@@ -25,6 +28,10 @@ const GameLobby = ({ socket }) => {
         } else {
             alert('Please enter a valid name and session code.');
         }
+    };
+
+    const handleStartGame = () => {
+        socket.emit('startGame', sessionId);
     };
 
     useEffect(() => {
@@ -43,13 +50,19 @@ const GameLobby = ({ socket }) => {
             setGameCreated(true);  // Only redirect if session exists
         });
 
+        socket.on('numHandsSelected', (numHands) => {
+            setMaxHands(numHands);  // Set for non-admin players to view
+        });
+
         socket.on('error', (error) => {
-            setErrorMessage(error.message);  // Display error message
+            alert(error.message);  // Display error message
         });
 
         return () => {
+            socket.off('sessionCreated');
+            socket.off('playerListUpdated');
+            socket.off('numHandsSelected');
             socket.off('error');
-            socket.off('addedToGame');
         };
     }, [socket]);
 
@@ -86,6 +99,20 @@ const GameLobby = ({ socket }) => {
             {gameCreated && (
                 <div>
                     {isAdmin && <h3>Session Code: {sessionId}</h3>}
+                    {isAdmin && (
+                        <div>
+                            <label htmlFor="numHands">Number of Hands:</label>
+                            <select id="numHands" value={numHands} onChange={(e) => setNumHands(parseInt(e.target.value))}>
+                                {[...Array(8).keys()].map(i => (
+                                    <option key={i + 1} value={i + 1}>{i + 1}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {!isAdmin && (
+                        <h3>Number of Hands: {maxHands}</h3>  // Non-admin sees the number of hands
+                    )}
 
                     <h2>Players in Lobby:</h2>
                     <ul>
@@ -95,9 +122,7 @@ const GameLobby = ({ socket }) => {
                     </ul>
 
                     {isAdmin && (
-                        <button onClick={() => socket.emit('startGame', sessionId)}>
-                            Start Game
-                        </button>
+                        <button onClick={handleStartGame}>Start Game</button>
                     )}
 
                     {!isAdmin && adminName && (
