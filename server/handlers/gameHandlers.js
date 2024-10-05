@@ -1,4 +1,3 @@
-// server/handlers/gameHandlers.js
 const { startGame, getRandomPlayer } = require('../game/game');
 const { calculateDecksRequired } = require('../utils/deckUtils');
 const { determineRoundWinner } = require('../game/gameLogic');
@@ -19,7 +18,8 @@ const handleCreateGame = (socket, playerName, numHands, io) => {
             currentTurnIndex: 0,
             decksRequired: 1,
             playedCards: [],
-            playersReadyForNextRound: 0  // Track how many players have clicked 'continue'
+            playersReadyForNextRound: 0,
+            startingPlayerIndex: 0
         },
         started: false
     };
@@ -71,7 +71,9 @@ const handleStartGame = (socket, sessionId, io) => {
         session.gameState.currentTurnIndex = session.players.findIndex(p => p.name === randomPlayer.name);
     }
 
-    startGame(session, session.gameState.currentHand, session.gameState.currentTurnIndex);
+    session.gameState.startingPlayerIndex = session.gameState.currentTurnIndex;
+
+    startGame(session, session.gameState.currentHand, session.gameState.startingPlayerIndex);
 
     // Emit the game start event to all players
     session.players.forEach(player => {
@@ -128,23 +130,43 @@ const handlePlayCard = (socket, { sessionId, card, playerName }, callback, io) =
     if (callback) callback({ success: true });
 };
 
+// This is where we handle the continue logic
 const handlePlayerContinue = (socket, sessionId, io) => {
     const session = sessions[sessionId];
-    if (!session) return;
+    if (!session) {
+        console.log("Session not found for continue event.");
+        return;
+    }
+
+    console.log(`Player with socket ID: ${socket.id} clicked continue for session ${sessionId}`);
 
     // Increment the number of players who have clicked 'Continue'
     session.gameState.playersReadyForNextRound += 1;
 
+    console.log(`Players ready for next round: ${session.gameState.playersReadyForNextRound}/${session.players.length}`);
+
     // If all players have clicked 'Continue', start the next round
     if (session.gameState.playersReadyForNextRound === session.players.length) {
-        // Clear the board and deal new cards for the next hand
+        console.log("All players ready. Starting next round...");
+
+        // Clear the board
         session.gameState.playedCards = [];
 
-        // Move to the next hand
-        session.gameState.currentHand += 1;
+        // Logic to determine the number of cards to deal for the next hand
+        const nextHandNumber = session.gameState.currentHand + 1;
+        const cardsToDeal = (nextHandNumber <= session.gameState.maxHands)
+            ? 2 * nextHandNumber - 1  // First increasing phase
+            : 2 * (session.gameState.maxHands * 2 - nextHandNumber) - 1;  // Decreasing phase
 
-        // Start the next round
-        startGame(session, session.gameState.currentHand, session.gameState.currentTurnIndex);
+        session.gameState.currentHand = nextHandNumber;
+
+        // Determine who starts the next hand (the next player in line)
+        session.gameState.startingPlayerIndex = (session.gameState.startingPlayerIndex + 1) % session.players.length;
+        session.gameState.currentTurnIndex = session.gameState.startingPlayerIndex;
+        session.gameState.turnName = session.players[session.gameState.currentTurnIndex].name;
+
+        // Start the next hand and deal new cards
+        startGame(session, session.gameState.currentHand, session.gameState.startingPlayerIndex, cardsToDeal);
 
         // Emit the next round start event to all players
         session.players.forEach(player => {
@@ -154,6 +176,9 @@ const handlePlayerContinue = (socket, sessionId, io) => {
                 currentHand: session.gameState.currentHand
             });
         });
+    } else {
+        console.log(`Player with socket ID: ${socket.id} is waiting for other players.`);
+        socket.emit('waitingForPlayers', { message: 'Waiting for other players to be ready...' });
     }
 };
 
@@ -162,5 +187,5 @@ module.exports = {
     handleJoinGame,
     handleStartGame,
     handlePlayCard,
-    handlePlayerContinue // Add the handler here
+    handlePlayerContinue // This handler ensures the "continue" logic is processed correctly
 };

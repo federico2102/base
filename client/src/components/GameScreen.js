@@ -12,6 +12,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
     const [boardCards, setBoardCards] = useState([]);
     const [roundComplete, setRoundComplete] = useState(false);
     const [winner, setWinner] = useState(null);
+    const [waitingMessage, setWaitingMessage] = useState('');
 
     useEffect(() => {
         const isTurn = turnName === myName;
@@ -54,6 +55,11 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             setRoundComplete(true);    // Show 'Continue' button
         });
 
+        // Waiting for other players
+        socket.on('waitingForPlayers', (data) => {
+            setWaitingMessage(data.message);
+        });
+
         // Clear the board and start the next round
         socket.on('nextRound', ({ playerHand, turnName, currentHand }) => {
             setBoardCards([]); // Clear the board
@@ -65,6 +71,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
                 currentHand
             });
             setIsMyTurn(turnName === myName); // Set if it's the player's turn
+            setWaitingMessage('');  // Clear waiting message
         });
 
         return () => {
@@ -72,6 +79,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             socket.off('cardPlayed');
             socket.off('handUpdated');
             socket.off('roundComplete');
+            socket.off('waitingForPlayers');
             socket.off('nextRound');
         };
     }, [myName, turnName, playerHand, currentHand]);
@@ -85,7 +93,8 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
 
     // Emit 'continueToNextRound' event when player clicks 'Continue'
     const handleContinue = () => {
-        socket.emit('continueToNextRound', sessionId);
+        console.log(`Player is emitting playerContinue for session: ${sessionId}`);
+        socket.emit('playerContinue', sessionId); // Emit the correct event
     };
 
     return (
@@ -127,9 +136,11 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             {roundComplete && (
                 <div>
                     <h2>{winner} won the round!</h2>
-                    <button onClick={handleContinue}>Continue</button>
+                    <button onClick={handleContinue}>Continue</button> {/* When clicked, emits the continue event */}
                 </div>
             )}
+
+            {waitingMessage && <p>{waitingMessage}</p>}
         </div>
     );
 };
