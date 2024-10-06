@@ -1,5 +1,5 @@
 // server/socketHandler.js
-const { handleCreateGame, handleJoinGame, handleStartGame, handlePlayCard, handlePlayerContinue } = require('./handlers/gameHandlers');
+const { handleCreateGame, handleJoinGame, handleDeclarations, handleStartGame, handlePlayCard, handlePlayerContinue } = require('./handlers/gameHandlers');
 
 const socketHandler = (io) => {
     io.on('connection', (socket) => {
@@ -18,6 +18,10 @@ const socketHandler = (io) => {
         // Event to start the game
         socket.on('startGame', (sessionId) => {
             handleStartGame(socket, sessionId, io); // Passing io for broadcasting
+        });
+
+        socket.on('declareRounds', (data) => {
+            handleDeclarations(socket, data, io); // Call the handler to process the declaration
         });
 
         // Event to play a card

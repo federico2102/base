@@ -85,7 +85,59 @@ const handleStartGame = (socket, sessionId, io) => {
     });
 };
 
-const handlePlayCard = (socket, { sessionId, card, playerName }, callback, io) => {
+// Declarations phase: Players declare how many rounds they expect to win.
+const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, io) => {
+    const session = sessions[sessionId];
+    if (!session) {
+        return socket.emit('error', { message: 'Session not found!' });
+    }
+
+    const currentPlayer = session.players.find(p => p.name === playerName);
+    if (!currentPlayer) {
+        return socket.emit('error', { message: 'Player not found!' });
+    }
+
+    // Check if the player is the last one to declare
+    const currentIndex = session.players.findIndex(p => p.name === playerName);
+    const isLastPlayer = currentIndex === session.players.length - 1;
+
+    // Calculate the total declarations so far
+    const totalDeclaredSoFar = session.players.reduce((total, player) => {
+        return player.declaredRounds !== undefined ? total + player.declaredRounds : total;
+    }, 0);
+
+    const maxCardsThisHand = session.gameState.currentHand * 2 - 1;
+
+    // Restrict the last player from declaring a number that makes the total equal to max cards
+    if (isLastPlayer && (totalDeclaredSoFar + declaredRounds === maxCardsThisHand)) {
+        return socket.emit('error', { message: "Your declaration cannot make the total equal to the number of cards in this hand." });
+    }
+
+    currentPlayer.declaredRounds = declaredRounds; // Store the declared rounds
+    io.to(sessionId).emit('declarationUpdated', { playerName, declaredRounds }); // Broadcast the declaration to all players
+
+    // Check if all players have declared
+    const allDeclared = session.players.every(p => p.declaredRounds !== undefined);
+    if (allDeclared) {
+        // Track who declared first for starting the round
+        session.gameState.currentTurnIndex = 0;  // Reset turn index to the first player
+        session.gameState.turnName = session.players[0].name;  // First player to declare starts playing
+
+        io.to(sessionId).emit('allDeclarationsMade', session.players); // Notify all players that declarations are complete
+        io.to(sessionId).emit('nextTurn', {
+            turnName: session.players[0].name,  // First player to declare starts the round
+            currentHand: session.gameState.currentHand
+        });
+    } else {
+        // Notify the next player that it’s their turn to declare
+        const nextIndex = (currentIndex + 1) % session.players.length;
+        const nextPlayer = session.players[nextIndex];
+        session.gameState.turnName = nextPlayer.name;
+        io.to(sessionId).emit('nextDeclarationTurn', { turnName: nextPlayer.name });
+    }
+};
+
+const handlePlayCard = (socket, { sessionId, card, playerName }, callback = () => {}, io) => {
     const session = sessions[sessionId];
     if (!session) return callback({ success: false, message: 'Session not found!' });
 
@@ -130,7 +182,6 @@ const handlePlayCard = (socket, { sessionId, card, playerName }, callback, io) =
     if (callback) callback({ success: true });
 };
 
-// This is where we handle the continue logic
 const handlePlayerContinue = (socket, sessionId, io) => {
     const session = sessions[sessionId];
     if (!session) {
@@ -182,10 +233,41 @@ const handlePlayerContinue = (socket, sessionId, io) => {
     }
 };
 
+// End of hand: Calculate scores based on the declarations and actual wins
+const calculateScores = (sessionId, io) => {
+    const session = sessions[sessionId];
+    if (!session) return;
+
+    session.players.forEach(player => {
+        const { declaredRounds, actualRoundsWon } = player;
+        if (declaredRounds === actualRoundsWon) {
+            player.score += 10 + actualRoundsWon;
+        } else {
+            player.score += actualRoundsWon;
+        }
+        player.declaredRounds = undefined;  // Reset for the next hand
+        player.actualRoundsWon = 0;  // Reset after score is calculated
+    });
+
+    io.to(sessionId).emit('scoresUpdated', session.players);  // Broadcast updated scores to everyone
+};
+
+// End of game logic: Show final scoreboard and determine the winner
+const endGame = (sessionId, io) => {
+    const session = sessions[sessionId];
+    if (!session) return;
+
+    const winner = session.players.reduce((maxPlayer, player) => player.score > maxPlayer.score ? player : maxPlayer, session.players[0]);
+    io.to(sessionId).emit('gameOver', { players: session.players, winner });
+};
+
 module.exports = {
     handleCreateGame,
     handleJoinGame,
     handleStartGame,
     handlePlayCard,
-    handlePlayerContinue // This handler ensures the "continue" logic is processed correctly
+    handlePlayerContinue,
+    handleDeclarations,
+    calculateScores,
+    endGame
 };
