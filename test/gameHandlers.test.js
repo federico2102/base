@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { io } from 'socket.io-client';
+import server from '../server/index.js';
 
 describe('Game Creation and Joining Tests', function() {
     let clientSocket;
