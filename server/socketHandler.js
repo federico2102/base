@@ -1,17 +1,23 @@
-import { handleCreateGame, handleJoinGame, handleDeclarations, handleStartGame, handlePlayCard, handlePlayerContinue } from './handlers/gameHandlers.js';
+import { handleCreateGame, handleJoinGame, handleDeclarations, handleStartGame,
+    handleMaxCards, handlePlayCard, handlePlayerContinue } from './handlers/gameHandlers.js';
 
 const socketHandler = (io) => {
     io.on('connection', (socket) => {
         //console.log('A user connected with ID:', socket.id);
 
         // Event to create a new game session
-        socket.on('createGame', (playerName, numHands) => {
-            handleCreateGame(socket, playerName, numHands, io); // Passing io for broadcasting
+        socket.on('createGame', (playerName) => {
+            handleCreateGame(socket, playerName, io); // Passing io for broadcasting
         });
 
         // Event to join an existing game session
         socket.on('joinGame', (data) => {
             handleJoinGame(socket, data, io); // Passing io for broadcasting
+        });
+
+        // Event to broadcast updates on maxCards configurations
+        socket.on('changeMaxCards', (maxCards, sessionId) => {
+            handleMaxCards(socket, maxCards, sessionId, io);
         });
 
         // Event to start the game

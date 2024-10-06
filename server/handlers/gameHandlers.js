@@ -4,7 +4,7 @@ import { determineRoundWinner } from '../game/gameLogic.js';
 
 const sessions = {};
 
-const handleCreateGame = (socket, playerName, maxCards, io) => {
+const handleCreateGame = (socket, playerName, io) => {
     const sessionId = Math.random().toString(36).substring(2, 8);
     // console.log(`Game created by ${playerName} with session ID: ${sessionId}`);
     if (playerName === '') {
@@ -17,7 +17,7 @@ const handleCreateGame = (socket, playerName, maxCards, io) => {
         gameState: {
             turnName: null,
             currentHand: 1,
-            maxCards: maxCards,
+            maxCards: 1,
             currentTurnIndex: 0,
             decksRequired: 1,
             playedCards: [],
@@ -57,6 +57,22 @@ const handleJoinGame = (socket, { playerName, code }, io) => {
     socket.emit('addedToGame', { players: session.players });
     io.to(code).emit('playerListUpdated', session.players); // Broadcast updated list to everyone else
 };
+
+const handleMaxCards = (socket, maxCards, sessionId, io) => {
+    const session = sessions[sessionId];
+
+    if (!session) {
+        console.error('Session not found for admin socket ID:', socket.id);
+        return socket.emit('error', { message: 'Session not found!' });
+    }
+
+    if (typeof maxCards !== 'number') {
+        console.error('Invalid maxCards value:', maxCards);
+        return socket.emit('error', { message: 'Invalid maxCards value!' });
+    }
+
+    io.to(sessionId).emit('maxCardsUpdated', maxCards);  // Broadcast the update to all players
+}
 
 const handleStartGame = (socket, sessionId, io) => {
     const session = sessions[sessionId];
@@ -271,7 +287,8 @@ const endGame = (sessionId, io) => {
 };
 
 export {handleCreateGame,
-handleJoinGame,
+    handleJoinGame,
+    handleMaxCards,
     handleStartGame,
     handlePlayCard,
     handlePlayerContinue,

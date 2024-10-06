@@ -30,6 +30,12 @@ const GameLobby = ({ socket, setMyName }) => {
         }
     };
 
+    const handleChangeMaxCards = (e) => {
+            setMaxCards(parseInt(e.target.value));
+            socket.emit('changeMaxCards',  maxCards, sessionId);  // Ensure maxCards is a number
+
+    }
+
     const handleStartGame = () => {
         socket.emit('startGame', sessionId);
     };
@@ -98,8 +104,7 @@ const GameLobby = ({ socket, setMyName }) => {
                     {isAdmin && (
                         <div>
                             <label htmlFor="maxCards">Max Number of Cards:</label>
-                            <select id="maxCards" value={maxCards} onChange={(e) =>
-                                setMaxCards(parseInt(e.target.value))}>
+                            <select id="maxCards" value={maxCards} onChange={handleChangeMaxCards}>
                                 {[1, 3, 5, 7, 9, 11, 13, 15].map(num => (
                                     <option key={num} value={num}>{num}</option>
                                 ))}
