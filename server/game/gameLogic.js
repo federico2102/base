@@ -27,4 +27,4 @@ const determineRoundWinner = (playedCards) => {
     return winningPlayer;
 };
 
-module.exports = { determineRoundWinner };
+export {determineRoundWinner};

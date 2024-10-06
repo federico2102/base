@@ -1,12 +1,15 @@
-const { startGame, getRandomPlayer } = require('../game/game');
-const { calculateDecksRequired } = require('../utils/deckUtils');
-const { determineRoundWinner } = require('../game/gameLogic');
+import { startGame, getRandomPlayer } from '../game/game.js';
+import { calculateDecksRequired } from '../utils/deckUtils.js';
+import { determineRoundWinner } from '../game/gameLogic.js';
 
 const sessions = {};
 
-const handleCreateGame = (socket, playerName, numHands, io) => {
+const handleCreateGame = (socket, playerName, maxCards, io) => {
     const sessionId = Math.random().toString(36).substring(2, 8);
-    console.log(`Game created by ${playerName} with session ID: ${sessionId}`);
+    // console.log(`Game created by ${playerName} with session ID: ${sessionId}`);
+    if (playerName === '') {
+        return socket.emit('error', { message: 'Name cannot be blank!' });
+    }
 
     sessions[sessionId] = {
         admin: playerName,
@@ -14,7 +17,7 @@ const handleCreateGame = (socket, playerName, numHands, io) => {
         gameState: {
             turnName: null,
             currentHand: 1,
-            maxHands: numHands,
+            maxCards: maxCards,
             currentTurnIndex: 0,
             decksRequired: 1,
             playedCards: [],
@@ -30,6 +33,10 @@ const handleCreateGame = (socket, playerName, numHands, io) => {
 };
 
 const handleJoinGame = (socket, { playerName, code }, io) => {
+    if (playerName === '' || code === '') {
+        return socket.emit('error', {message: 'Name and session code cannot be blank!'});
+    }
+
     const session = sessions[code];
     if (!session) {
         return socket.emit('error', { message: 'Session not found!' });
@@ -57,8 +64,7 @@ const handleStartGame = (socket, sessionId, io) => {
 
     session.started = true;
     const numPlayers = session.players.length;
-    const maxCardsPerHand = 2 * session.gameState.maxHands - 1;
-    const totalCardsRequired = numPlayers * maxCardsPerHand;
+    const totalCardsRequired = numPlayers * session.gameState.maxCards;
 
     session.gameState.decksRequired = calculateDecksRequired(totalCardsRequired);
 
@@ -205,9 +211,12 @@ const handlePlayerContinue = (socket, sessionId, io) => {
 
         // Logic to determine the number of cards to deal for the next hand
         const nextHandNumber = session.gameState.currentHand + 1;
-        const cardsToDeal = (nextHandNumber <= session.gameState.maxHands)
+        let cardsToDeal = (nextHandNumber * 2 - 1 <= session.gameState.maxCards)
             ? 2 * nextHandNumber - 1  // First increasing phase
-            : 2 * (session.gameState.maxHands * 2 - nextHandNumber) - 1;  // Decreasing phase
+            : session.gameState.maxCards;   // Starting second half of the game
+        if (nextHandNumber * 2 - 1 > session.gameState.maxCards+2) {    // Decreasing phase
+            cardsToDeal = session.gameState.maxCards - (2 * nextHandNumber - 3 - session.gameState.maxCards);
+        }
 
         session.gameState.currentHand = nextHandNumber;
 
@@ -261,13 +270,11 @@ const endGame = (sessionId, io) => {
     io.to(sessionId).emit('gameOver', { players: session.players, winner });
 };
 
-module.exports = {
-    handleCreateGame,
-    handleJoinGame,
+export {handleCreateGame,
+handleJoinGame,
     handleStartGame,
     handlePlayCard,
     handlePlayerContinue,
     handleDeclarations,
     calculateScores,
-    endGame
-};
+    endGame};

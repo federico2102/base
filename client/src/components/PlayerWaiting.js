@@ -12,4 +12,4 @@ const PlayerWaiting = ({ players, adminName }) => (
     </div>
 );
 
-export default PlayerWaiting;
+export {PlayerWaiting};

@@ -32,4 +32,4 @@ function dealCards(deck, numPlayers, numCardsPerPlayer) {
     return hands;
 }
 
-module.exports = { createDeck, shuffleDeck, dealCards };
+export {createDeck, shuffleDeck, dealCards};

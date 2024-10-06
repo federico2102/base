@@ -1,5 +1,4 @@
-// server/game/game.js
-const { createDeck, shuffleDeck, dealCards } = require('./deck');
+import { createDeck, shuffleDeck, dealCards } from './deck.js';
 
 const startGame = (session, currentHand, previousStartingPlayerIndex) => {
     const numPlayers = session.players.length;
@@ -20,4 +19,4 @@ const getRandomPlayer = (players) => {
     return players[Math.floor(Math.random() * players.length)];
 };
 
-module.exports = { startGame, getRandomPlayer };
+export  {startGame, getRandomPlayer};

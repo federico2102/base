@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
-import GameLobby from './components/GameLobby';
-import GameScreen from './components/GameScreen';
+import GameLobby from './components/GameLobby.js';
+import GameScreen from './components/GameScreen.js';
 
 const socket = io('http://localhost:4000'); // Ensure this points to your server
 

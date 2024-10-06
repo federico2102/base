@@ -1,9 +1,8 @@
-// server/socketHandler.js
-const { handleCreateGame, handleJoinGame, handleDeclarations, handleStartGame, handlePlayCard, handlePlayerContinue } = require('./handlers/gameHandlers');
+import { handleCreateGame, handleJoinGame, handleDeclarations, handleStartGame, handlePlayCard, handlePlayerContinue } from './handlers/gameHandlers.js';
 
 const socketHandler = (io) => {
     io.on('connection', (socket) => {
-        console.log('A user connected with ID:', socket.id);
+        //console.log('A user connected with ID:', socket.id);
 
         // Event to create a new game session
         socket.on('createGame', (playerName, numHands) => {
@@ -36,9 +35,9 @@ const socketHandler = (io) => {
 
         // Event for when a player disconnects
         socket.on('disconnect', () => {
-            console.log('User disconnected:', socket.id);
+            //console.log('User disconnected:', socket.id);
         });
     });
 };
 
-module.exports = socketHandler;
+export default socketHandler;

@@ -8,12 +8,12 @@ const GameLobby = ({ socket, setMyName }) => {
     const [adminName, setAdminName] = useState('');
     const [gameCreated, setGameCreated] = useState(false);  // Track if a game is created or joined
     const [errorMessage, setErrorMessage] = useState(null); // To show error message
-    const [numHands, setNumHands] = useState(1);  // Number of hands chosen by the admin
+    const [maxCards, setMaxCards] = useState(1);  // Number of hands chosen by the admin
 
     const handleCreateGame = () => {
         if (playerName) {
             setMyName(playerName);
-            socket.emit('createGame', playerName, numHands);
+            socket.emit('createGame', playerName, maxCards);
             setIsAdmin(true);
             setGameCreated(true);
         } else {
@@ -97,18 +97,18 @@ const GameLobby = ({ socket, setMyName }) => {
                     {isAdmin && <h3>Session Code: {sessionId}</h3>}
                     {isAdmin && (
                         <div>
-                            <label htmlFor="numHands">Number of Hands:</label>
-                            <select id="numHands" value={numHands} onChange={(e) =>
-                                setNumHands(parseInt(e.target.value))}>
-                                {[...Array(8).keys()].map(i => (
-                                    <option key={i + 1} value={i + 1}>{i + 1}</option>
+                            <label htmlFor="maxCards">Max Number of Cards:</label>
+                            <select id="maxCards" value={maxCards} onChange={(e) =>
+                                setMaxCards(parseInt(e.target.value))}>
+                                {[1, 3, 5, 7, 9, 11, 13, 15].map(num => (
+                                    <option key={num} value={num}>{num}</option>
                                 ))}
                             </select>
                         </div>
                     )}
 
                     {!isAdmin && (
-                        <h3>Number of Hands: {numHands}</h3>  // Non-admin sees the number of hands
+                        <h3>Number of Hands: {maxCards}</h3>  // Non-admin sees the number of hands
                     )}
 
                     <h2>Players in Lobby:</h2>
