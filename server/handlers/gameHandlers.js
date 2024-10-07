@@ -16,7 +16,7 @@ const handleCreateGame = (socket, playerName, io) => {
         players: [{ name: playerName, id: socket.id, hand: [] }],
         gameState: {
             turnName: null,
-            currentHand: 1,
+            currentHand: 0,
             maxCards: 1,
             currentTurnIndex: 0,
             decksRequired: 1,
@@ -99,6 +99,8 @@ const handleStartGame = (socket, sessionId, io) => {
 
     startGame(session, session.gameState.currentHand, session.gameState.startingPlayerIndex);
 
+    session.gameState.currentHand++;
+
     // Emit the game start event to all players
     session.players.forEach(player => {
         io.to(player.id).emit('gameStarted', {
@@ -123,7 +125,9 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, i
 
     // Check if the player is the last one to declare
     const currentIndex = session.players.findIndex(p => p.name === playerName);
-    const isLastPlayer = currentIndex === session.players.length - 1;
+    const isLastPlayer = currentIndex ===
+        (session.gameState.startingPlayerIndex === 0 ? session.players.length - 1 :
+        session.gameState.startingPlayerIndex - 1);
 
     // Calculate the total declarations so far
     const totalDeclaredSoFar = session.players.reduce((total, player) => {
@@ -143,13 +147,14 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, i
     // Check if all players have declared
     const allDeclared = session.players.every(p => p.declaredRounds !== undefined);
     if (allDeclared) {
-        // Track who declared first for starting the round
-        session.gameState.currentTurnIndex = 0;  // Reset turn index to the first player
-        session.gameState.turnName = session.players[0].name;  // First player to declare starts playing
+        const nextIndex = (currentIndex + 1) % session.players.length;
+        const nextPlayer = session.players[nextIndex];
+        session.gameState.turnName = nextPlayer.name;
+        session.gameState.currentTurnIndex = nextIndex;
 
         io.to(sessionId).emit('allDeclarationsMade', session.players); // Notify all players that declarations are complete
         io.to(sessionId).emit('nextTurn', {
-            turnName: session.players[0].name,  // First player to declare starts the round
+            turnName: session.gameState.turnName,  // First player to declare starts the round
             currentHand: session.gameState.currentHand
         });
     } else {
@@ -157,6 +162,7 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, i
         const nextIndex = (currentIndex + 1) % session.players.length;
         const nextPlayer = session.players[nextIndex];
         session.gameState.turnName = nextPlayer.name;
+        session.gameState.currentTurnIndex = nextIndex;
         io.to(sessionId).emit('nextDeclarationTurn', { turnName: nextPlayer.name });
     }
 };
@@ -184,9 +190,10 @@ const handlePlayCard = (socket, { sessionId, card, playerName }, callback = () =
     // If all players have played, determine the winner and hold until all click continue
     if (session.gameState.playedCards.length === session.players.length) {
         const winningPlayer = determineRoundWinner(session.gameState.playedCards);
+        //console.log('winningPlayer: ' + winningPlayer);
 
         // Broadcast the complete board and winner to all players
-        io.to(sessionId).emit('roundComplete', { playedCards: session.gameState.playedCards, winningPlayer });
+        io.to(sessionId).emit('roundComplete', { winner: winningPlayer });
 
         // Reset for next round but wait for all players to click 'continue'
         session.gameState.playersReadyForNextRound = 0;  // Reset ready count
@@ -226,17 +233,7 @@ const handlePlayerContinue = (socket, sessionId, io) => {
 
         // Clear the board
         session.gameState.playedCards = [];
-
-        // Logic to determine the number of cards to deal for the next hand
-        const nextHandNumber = session.gameState.currentHand + 1;
-        let cardsToDeal = (nextHandNumber * 2 - 1 <= session.gameState.maxCards)
-            ? 2 * nextHandNumber - 1  // First increasing phase
-            : session.gameState.maxCards;   // Starting second half of the game
-        if (nextHandNumber * 2 - 1 > session.gameState.maxCards+2) {    // Decreasing phase
-            cardsToDeal = session.gameState.maxCards - (2 * nextHandNumber - 3 - session.gameState.maxCards);
-        }
-
-        session.gameState.currentHand = nextHandNumber;
+        session.gameState.currentHand++;
 
         // Determine who starts the next hand (the next player in line)
         session.gameState.startingPlayerIndex = (session.gameState.startingPlayerIndex + 1) % session.players.length;
@@ -244,7 +241,7 @@ const handlePlayerContinue = (socket, sessionId, io) => {
         session.gameState.turnName = session.players[session.gameState.currentTurnIndex].name;
 
         // Start the next hand and deal new cards
-        startGame(session, session.gameState.currentHand, session.gameState.startingPlayerIndex, cardsToDeal);
+        startGame(session, session.gameState.currentHand, session.gameState.startingPlayerIndex);
 
         // Emit the next round start event to all players
         session.players.forEach(player => {

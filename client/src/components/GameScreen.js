@@ -21,12 +21,12 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
 
     // Transition from declaration phase to game playing phase
     useEffect(() => {
-        const isTurn = turnName === myName && isDeclarationPhase;  // Check if it's my turn during declaration phase
+        const isTurn = turnName === myName;  // Check if it's my turn during declaration phase
         setIsMyTurn(isTurn); // Update turn state
         setGameState({
             playerHand: playerHand,
             turnName: turnName,
-            currentHand: currentHand
+            currentHand: currentHand || 1
         });
 
         // Listen for declaration updates
@@ -46,7 +46,6 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
         socket.on('allDeclarationsMade', (players) => {
             console.log('All declarations have been made:', players);
             setIsDeclarationPhase(false);  // End declaration phase
-            setIsMyTurn(turnName === myName && !isDeclarationPhase);  // Update the first player to play
         });
 
         // Handle the next turn during gameplay after declarations
@@ -57,7 +56,29 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
                 turnName,
                 currentHand
             }));
-            setIsMyTurn(turnName === myName && !isDeclarationPhase);  // Update the turn for playing cards
+            setIsMyTurn(turnName === myName);  // Update the turn for playing cards
+        });
+
+        // Handle 'cardPlayed' event
+        socket.on('cardPlayed', ({ playerName, card }) => {
+            console.log(`${playerName} played ${card}.`);
+            setBoardCards(prev => [...prev, { playerName, card }]);  // Add the played card to the board
+        });
+
+        // Handle 'handUpdated' event
+        socket.on('handUpdated', ({ playerHand, turnName }) => {
+            console.log('Hand updated for the current player.');
+            setGameState(prevState => ({
+                ...prevState,
+                playerHand
+            }));
+        });
+
+        // Handle 'roundCompleted' event
+        socket.on('roundComplete', ({ winner }) => {
+            setWinner(winner);
+            console.log(`${winner} won the round.`);
+            setRoundComplete(true);  // Set round as complete and display the winner
         });
 
         // Handle errors (such as last player restriction)
@@ -70,6 +91,9 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             socket.off('nextDeclarationTurn');
             socket.off('allDeclarationsMade');
             socket.off('nextTurn');
+            socket.off('cardPlayed');
+            socket.off('handUpdated');
+            socket.off('roundCompleted');
             socket.off('error');
         };
     }, [socket, isDeclarationPhase, myName]);
@@ -78,17 +102,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
         const validDeclaredRounds = declaredRounds === '' ? 0 : parseInt(declaredRounds);
         console.log(`Submitting declaration: ${validDeclaredRounds} for player: ${myName}`);
         socket.emit('declareRounds', { sessionId, playerName: myName, declaredRounds: validDeclaredRounds });
-        setDeclaredRounds(''); // Clear input after submission
     };
-
-    // Calculate allowed declaration options for the last player
-    useEffect(() => {
-        if (isLastPlayer) {
-            const totalDeclared = Object.values(declarations).reduce((sum, val) => sum + (val || 0), 0);
-            const restrictedMax = maxDeclaration - totalDeclared;
-            setMaxDeclaration(restrictedMax >= 0 ? restrictedMax : 0);
-        }
-    }, [isLastPlayer, declarations, maxDeclaration]);
 
     const handlePlayCard = () => {
         if (selectedCard) {

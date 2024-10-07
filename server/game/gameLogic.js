@@ -8,19 +8,20 @@ const determineRoundWinner = (playedCards) => {
     let winningPlayer = null;
 
     playedCards.forEach(({ playerName, card }) => {
-        const rank = card.slice(0, -1);
-        const suit = card.slice(-1);
-        const cardValue = cardValues[rank];
+        const rank = card.slice(0, -1);  // Extract rank (2, 3, ..., K, A)
+        const suit = card.slice(-1);  // Extract suit (H, D, S, C)
+        const cardValue = cardValues[rank];  // Map rank to value
         const isAceOfHearts = (rank === 'A' && suit === 'H');
 
         if (
-            isAceOfHearts ||
-            !highestCard ||
-            cardValue > cardValues[highestCard.rank] ||
-            (cardValue === cardValues[highestCard.rank] && highestCard.suit !== 'H')
+            isAceOfHearts ||  // Ace of Hearts is the highest priority
+            !highestCard ||  // No highest card yet
+            cardValue > cardValues[highestCard.rank] ||  // Current card is of higher rank
+            (cardValue === cardValues[highestCard.rank] && suit === 'H') ||  // Tiebreaker: Hearts beats others
+            (cardValue === cardValues[highestCard.rank] && suit > highestCard.suit)  // Compare suit if ranks are equal
         ) {
-            highestCard = { rank, suit, playerName };
-            winningPlayer = playerName;
+            highestCard = { rank, suit, playerName };  // Update highest card
+            winningPlayer = playerName;  // Update winner
         }
     });
 
