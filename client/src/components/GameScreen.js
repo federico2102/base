@@ -106,7 +106,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
     return (
         <div>
             <h1>Game in Progress (Hand {gameState.currentHand})</h1>
-            <h2>It's {gameState.turnName}'s turn</h2>
+            <h2>It's {isMyTurn ? 'your' : `${gameState.turnName}'s`} turn</h2>
 
             {/* Always show player's cards */}
             <div>

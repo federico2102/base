@@ -54,7 +54,7 @@ const handleJoinGame = (socket, { playerName, code }, io) => {
     session.players.push({ name: playerName, id: socket.id, hand: [] });
     socket.join(code);
 
-    socket.emit('addedToGame', { players: session.players });
+    socket.emit('addedToGame', { players: session.players, maxCards: session.gameState.maxCards });
     io.to(code).emit('playerListUpdated', session.players); // Broadcast updated list to everyone else
 };
 
@@ -70,6 +70,8 @@ const handleMaxCards = (socket, maxCards, sessionId, io) => {
         console.error('Invalid maxCards value:', maxCards);
         return socket.emit('error', { message: 'Invalid maxCards value!' });
     }
+
+    session.gameState.maxCards = maxCards;
 
     io.to(sessionId).emit('maxCardsUpdated', maxCards);  // Broadcast the update to all players
 }

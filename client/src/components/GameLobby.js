@@ -31,9 +31,7 @@ const GameLobby = ({ socket, setMyName }) => {
     };
 
     const handleChangeMaxCards = (e) => {
-            setMaxCards(parseInt(e.target.value));
-            socket.emit('changeMaxCards',  maxCards, sessionId);  // Ensure maxCards is a number
-
+            socket.emit('changeMaxCards',  parseInt(e.target.value), sessionId);
     }
 
     const handleStartGame = () => {
@@ -52,9 +50,14 @@ const GameLobby = ({ socket, setMyName }) => {
             }
         });
 
-        socket.on('addedToGame', () => {
+        socket.on('addedToGame', (data) => {
+            setMaxCards(data.maxCards);
             setGameCreated(true);  // Only redirect if session exists
         });
+
+        socket.on('maxCardsUpdated', (maxCards) => {
+            setMaxCards(maxCards);
+        })
 
         socket.on('error', (error) => {
             alert(error.message);  // Display error message
@@ -113,7 +116,7 @@ const GameLobby = ({ socket, setMyName }) => {
                     )}
 
                     {!isAdmin && (
-                        <h3>Number of Hands: {maxCards}</h3>  // Non-admin sees the number of hands
+                        <h3>Max Number of Cards: {maxCards}</h3>  // Non-admin sees the number of hands
                     )}
 
                     <h2>Players in Lobby:</h2>
