@@ -39,7 +39,7 @@ function createGameAndAddPlayers(io, clientSocket, numPlayers) {
                     playerSocket.emit('joinGame', { playerName: player, code: sessionId });
 
                     playerSocket.once('addedToGame', (data) => {
-                        playerData.push({ playerInfo: data, socket: playerSocket });
+                        playerData.push({ addedToGameData: data, socket: playerSocket });
                         playersJoined++;
                         if (playersJoined === numPlayers - 1) {
                             resolve({ sessionId, playerData });

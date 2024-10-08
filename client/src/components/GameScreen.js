@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
 
-const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, socket }) => {
+const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, socket , resetKey}) => {
     const [selectedCard, setSelectedCard] = useState(null);
     const [isMyTurn, setIsMyTurn] = useState(false);
     const [isDeclarationPhase, setIsDeclarationPhase] = useState(true);
@@ -11,13 +11,14 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
         currentHand: currentHand || 1
     });
     const [declarations, setDeclarations] = useState({});
+    const [roundsWon, setRoundsWon] = useState({});
     const [boardCards, setBoardCards] = useState([]);
-    const [roundComplete, setRoundComplete] = useState(false);
+    const [roundFinished, setRoundFinished] = useState(false);
     const [winner, setWinner] = useState(null);
     const [waitingMessage, setWaitingMessage] = useState('');
     const [declaredRounds, setDeclaredRounds] = useState(''); // Input for declarations
+    const [actualRoundsWon , setActualRoundsWon] = useState(0);
     const [maxDeclaration, setMaxDeclaration] = useState(gameState.currentHand * 2 - 1); // Max cards in the hand
-    const [isLastPlayer, setIsLastPlayer] = useState(false); // Check if the player is the last one to declare
 
     // Transition from declaration phase to game playing phase
     useEffect(() => {
@@ -33,6 +34,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
         socket.on('declarationUpdated', ({ playerName, declaredRounds }) => {
             console.log(`${playerName} declared ${declaredRounds} rounds.`);
             setDeclarations(prev => ({ ...prev, [playerName]: declaredRounds }));
+            setRoundsWon(prev => ({ ...prev, [playerName]: 0 }))
         });
 
         // Listen for next player's turn to declare
@@ -46,6 +48,13 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
         socket.on('allDeclarationsMade', (players) => {
             console.log('All declarations have been made:', players);
             setIsDeclarationPhase(false);  // End declaration phase
+            console.log(`It's now ${turnName}'s turn to play.`);
+            setGameState((prevState) => ({
+                ...prevState,
+                turnName,
+                currentHand
+            }));
+            setIsMyTurn(turnName === myName);  // Update the turn for playing cards
         });
 
         // Handle the next turn during gameplay after declarations
@@ -65,20 +74,52 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             setBoardCards(prev => [...prev, { playerName, card }]);  // Add the played card to the board
         });
 
-        // Handle 'handUpdated' event
+        // The card that a player played is no longer part of the player's hand
         socket.on('handUpdated', ({ playerHand, turnName }) => {
             console.log('Hand updated for the current player.');
             setGameState(prevState => ({
                 ...prevState,
-                playerHand
+                playerHand,
+                turnName
             }));
         });
 
-        // Handle 'roundCompleted' event
-        socket.on('roundComplete', ({ winner }) => {
+        // Handle 'roundFinished' event
+        socket.on('roundFinished', ({ winner, roundsWon }) => {
             setWinner(winner);
-            console.log(`${winner} won the round.`);
-            setRoundComplete(true);  // Set round as complete and display the winner
+            setRoundsWon(prev => ({ ...prev, [winner]: roundsWon }))
+            //console.log(`${winner} won the round.`);
+            setRoundFinished(true);  // Set round as complete and display the winner
+        });
+
+        socket.on('reset', () => {
+            setBoardCards([]); // Reset the board for the new hand
+            setDeclarations({}); // Clear declarations
+            setRoundsWon({}); // Clear rounds won
+            setWinner(null); // Clear winner
+            setWaitingMessage(''); // Clear waiting message
+            setDeclaredRounds(''); // Reset declared rounds input
+            setActualRoundsWon(0); // Reset actual rounds won
+            setRoundFinished(false); // Reset round finished state
+            setIsDeclarationPhase(true);  // Reset to declaration phase
+        });
+
+        // Handle next hand start
+        socket.on('nextHand', ({ playerHand, turnName, currentHand }) => {
+            console.log(`It's now ${turnName}'s turn to play.`);
+            setIsMyTurn(turnName === myName);  // Update the turn for playing cards
+            setGameState({
+                playerHand: playerHand,
+                turnName: turnName,
+                currentHand: currentHand
+            });
+            setMaxDeclaration(currentHand * 2 - 1);
+        });
+
+
+        // Handle waiting for players to be ready to continue with the next round
+        socket.on('waitingForPlayers', ({message}) => {
+            setWaitingMessage(message);
         });
 
         // Handle errors (such as last player restriction)
@@ -93,10 +134,13 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             socket.off('nextTurn');
             socket.off('cardPlayed');
             socket.off('handUpdated');
-            socket.off('roundCompleted');
+            socket.off('roundFinished');
+            socket.off('reset');
+            socket.off('nextHand');
+            socket.off('waitingForPlayers');
             socket.off('error');
         };
-    }, [socket, isDeclarationPhase, myName]);
+    }, [socket, isDeclarationPhase, myName, playerHand, turnName, currentHand]);
 
     const handleDeclarationSubmit = () => {
         const validDeclaredRounds = declaredRounds === '' ? 0 : parseInt(declaredRounds);
@@ -125,7 +169,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             {/* Always show player's cards */}
             <div>
                 <h3>Your Cards</h3>
-                <div style={{ display: 'flex', flexDirection: 'row' }}>
+                <div style={{display: 'flex', flexDirection: 'row'}}>
                     {gameState.playerHand.map((card, index) => (
                         <Card
                             key={index}
@@ -172,30 +216,39 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
 
             <div>
                 <h3>Board (Played Cards)</h3>
-                <div style={{ display: 'flex', flexDirection: 'row' }}>
+                <div style={{display: 'flex', flexDirection: 'row'}}>
                     {boardCards.map((item, index) => (
-                        <div key={index} style={{ marginRight: '10px' }}>
-                            <Card value={item.card} />
+                        <div key={index} style={{marginRight: '10px'}}>
+                            <Card value={item.card}/>
                             <p>Played by: {item.playerName}</p>
                         </div>
                     ))}
                 </div>
             </div>
 
-            {roundComplete && (
+            {roundFinished && (
                 <div>
                     <h2>{winner} won the round!</h2>
-                    <button onClick={handleContinue}>Continue</button> {/* When clicked, emits the continue event */}
+                    <button onClick={handleContinue}>Continue</button>
+                    {/* When clicked, emits the continue event */}
+
+                    {/* Display the waiting message if it's set */}
+                    {waitingMessage && <p>{waitingMessage}</p>}
                 </div>
+
             )}
 
             {/* Declarations Section */}
             <div>
                 <h3>Declarations</h3>
                 {Object.keys(declarations).map((playerName) => (
-                    <p key={playerName}>{playerName}: {declarations[playerName]} rounds declared</p>
+                    <p key={playerName}>
+                        {playerName}: {declarations[playerName]} rounds declared
+                        / {roundsWon[playerName]} rounds won
+                    </p>
                 ))}
             </div>
+
 
             {/* Scoreboard Section */}
             <div>

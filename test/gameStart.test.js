@@ -9,7 +9,7 @@ describe('Game Start Tests', function() {
     // Set up connection using the helper
     setUpConnection(io, clientSocketRef);
 
-    it('should deal cards to all players', (done) => {
+    it('should deal one card to each player and broadcast currentHand and turnName to all players', (done) => {
         const clientSocket = clientSocketRef.current;
 
         // Create a game with multiple players using the helper function
@@ -18,19 +18,21 @@ describe('Game Start Tests', function() {
                 // Step 1: Start the game (admin action)
                 clientSocket.emit('startGame', sessionId);
 
-                let playersReceivedCards = 0;
+                let playersStartedGame = 0;
 
-                // Step 2: Loop through each player and listen for the "cardsDealt" event
+                // Step 2: Loop through each player and listen for the "gameStarted" event
                 playerData.forEach(({ socket }) => {
                     socket.on('gameStarted', (data) => {
                         try {
                             expect(data.playerHand).to.be.an('array');  // Ensure that the cards are an array
-                            expect(data.playerHand.length).to.be.greaterThan(0);  // Ensure that the player received at least 1 card
+                            expect(data.playerHand.length).to.be.equal(1);  // Ensure that the player received at least 1 card
+                            expect(data.turnName).to.be.not.equal('');  // Ensure that all players get a turnName
+                            expect(data.currentHand).to.be.equal(1);    // Ensure all players get that it's the first hand
 
-                            playersReceivedCards++;
+                            playersStartedGame++;
 
-                            // Step 3: Once all players have received their cards, finish the test
-                            if (playersReceivedCards === playerData.length) {
+                            // Step 3: Once all players have started the game, finish the test
+                            if (playersStartedGame === playerData.length) {
                                 done();  // Test passes when all players have received their cards
                             }
                         } catch (error) {
@@ -69,7 +71,7 @@ describe('Game Start Tests', function() {
                         expect(turnName).to.be.a('string').that.is.not.empty;
 
                         // Verify that the turnName matches one of the players' names
-                        const playerNames = playerData[3].playerInfo.players.map(player => player.name);  // Get player names
+                        const playerNames = playerData[3].addedToGameData.players.map(player => player.name);  // Get player names
                         expect(playerNames).to.include(turnName);  // Ensure that turnName is in the list of player names
 
                         done();  // Test passes if the turn is correctly assigned
@@ -88,6 +90,37 @@ describe('Game Start Tests', function() {
             });
     });
 
+    it('should not allow anyone to play a card at the start of the game', (done) => {
+        const clientSocket = clientSocketRef.current;
 
-    // Other tests related to game start
+        createGameAndAddPlayers(io, clientSocket, 5)
+            .then(({ sessionId, playerData }) => {
+                clientSocket.emit('startGame', sessionId);
+                let playersProcessed = 0;  // Track how many players have received the error
+
+                // Step 2: Loop through each player and listen for the "gameStarted" event
+                playerData.forEach(({ addedToGameData, socket }, index) => {
+                    socket.on('gameStarted', (data) => {
+                        socket.emit('playCard', {
+                            sessionId, card: data.playerHand[0],
+                            playerName: addedToGameData.players[index].name
+                        });
+
+                        // Step 3: Listen for the 'error' event
+                        socket.on('error', (data) => {
+                            expect(data.message).to.equal('Cannot play cards during declarations phase!');
+                            playersProcessed++;
+
+                            // Step 4: Only call done() after all players have processed
+                            if (playersProcessed === playerData.length) {
+                                done();
+                            }
+                        });
+                    });
+                });
+            })
+            .catch((error) => {
+                done(error);  // Fail the test if game creation or player joining fails
+            });
+    });
 });

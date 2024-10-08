@@ -30,8 +30,8 @@ const socketHandler = (io) => {
         });
 
         // Event to play a card
-        socket.on('playCard', (data, callback) => {
-            handlePlayCard(socket, data, callback, io); // Passing io for broadcasting
+        socket.on('playCard', (data) => {
+            handlePlayCard(socket, data, io); // Passing io for broadcasting
         });
 
         // Event to know when all players are ready to move on to the next round

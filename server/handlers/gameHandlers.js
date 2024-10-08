@@ -22,7 +22,8 @@ const handleCreateGame = (socket, playerName, io) => {
             decksRequired: 1,
             playedCards: [],
             playersReadyForNextRound: 0,
-            startingPlayerIndex: 0
+            startingPlayerIndex: 0,
+            isDeclarationsPhase: true,
         },
         started: false
     };
@@ -106,6 +107,7 @@ const handleStartGame = (socket, sessionId, io) => {
         io.to(player.id).emit('gameStarted', {
             playerHand: player.hand,
             turnName: session.gameState.turnName,
+            currentHand: session.gameState.currentHand,
             sessionId
         });
     });
@@ -142,6 +144,7 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, i
     }
 
     currentPlayer.declaredRounds = declaredRounds; // Store the declared rounds
+    currentPlayer.actualRoundsWon = 0;
     io.to(sessionId).emit('declarationUpdated', { playerName, declaredRounds }); // Broadcast the declaration to all players
 
     // Check if all players have declared
@@ -152,11 +155,14 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, i
         session.gameState.turnName = nextPlayer.name;
         session.gameState.currentTurnIndex = nextIndex;
 
-        io.to(sessionId).emit('allDeclarationsMade', session.players); // Notify all players that declarations are complete
-        io.to(sessionId).emit('nextTurn', {
+        io.to(sessionId).emit('allDeclarationsMade', {  // Notify all player that declarations phase is over
             turnName: session.gameState.turnName,  // First player to declare starts the round
             currentHand: session.gameState.currentHand
         });
+       /* io.to(sessionId).emit('nextTurn', {
+            turnName: session.gameState.turnName,  // First player to declare starts the round
+            currentHand: session.gameState.currentHand
+        });*/
     } else {
         // Notify the next player that it’s their turn to declare
         const nextIndex = (currentIndex + 1) % session.players.length;
@@ -167,12 +173,16 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, i
     }
 };
 
-const handlePlayCard = (socket, { sessionId, card, playerName }, callback = () => {}, io) => {
+const handlePlayCard = (socket, { sessionId, card, playerName } , io) => {
     const session = sessions[sessionId];
-    if (!session) return callback({ success: false, message: 'Session not found!' });
+    if (!session) return socket.emit('error', {message: 'Session not found!' });
+
+    // Player can only play a card if it's not declarations phase
+    if (session.gameState.isDeclarationsPhase)
+        return socket.emit('error', { message: 'Cannot play cards during declarations phase!' });
 
     const currentPlayer = session.players[session.gameState.currentTurnIndex];
-    if (currentPlayer.name !== playerName) return callback({ success: false, message: "It's not your turn!" });
+    if (currentPlayer.name !== playerName) return socket.emit('error', {message: "It's not your turn!" });
 
     // Remove the played card from the current player's hand
     currentPlayer.hand = currentPlayer.hand.filter(c => c !== card);
@@ -185,15 +195,19 @@ const handlePlayCard = (socket, { sessionId, card, playerName }, callback = () =
     io.to(sessionId).emit('cardPlayed', { card, playerName });
 
     // Broadcast the updated hand for the current player only (to remove the played card from their hand)
-    socket.emit('handUpdated', { playerHand: currentPlayer.hand });
+    io.to(currentPlayer.id).emit('handUpdated', { playerHand: currentPlayer.hand });
 
     // If all players have played, determine the winner and hold until all click continue
     if (session.gameState.playedCards.length === session.players.length) {
         const winningPlayer = determineRoundWinner(session.gameState.playedCards);
         //console.log('winningPlayer: ' + winningPlayer);
 
+        // Update actualRoundsWon for the winning player
+        session.players.find(p => p.name === winningPlayer).actualRoundsWon++;
+        const roundsWon = session.players.find(p => p.name === winningPlayer).actualRoundsWon;
+
         // Broadcast the complete board and winner to all players
-        io.to(sessionId).emit('roundComplete', { winner: winningPlayer });
+        io.to(sessionId).emit('roundFinished', { winner: winningPlayer, roundsWon });
 
         // Reset for next round but wait for all players to click 'continue'
         session.gameState.playersReadyForNextRound = 0;  // Reset ready count
@@ -209,8 +223,6 @@ const handlePlayCard = (socket, { sessionId, card, playerName }, callback = () =
             currentHand: session.gameState.currentHand
         });
     }
-
-    if (callback) callback({ success: true });
 };
 
 const handlePlayerContinue = (socket, sessionId, io) => {
@@ -225,35 +237,48 @@ const handlePlayerContinue = (socket, sessionId, io) => {
     // Increment the number of players who have clicked 'Continue'
     session.gameState.playersReadyForNextRound += 1;
 
-    console.log(`Players ready for next round: ${session.gameState.playersReadyForNextRound}/${session.players.length}`);
+    //console.log(`Players ready for next round: ${session.gameState.playersReadyForNextRound}/${session.players.length}`);
 
     // If all players have clicked 'Continue', start the next round
     if (session.gameState.playersReadyForNextRound === session.players.length) {
         console.log("All players ready. Starting next round...");
 
-        // Clear the board
-        session.gameState.playedCards = [];
-        session.gameState.currentHand++;
+        // If all the rounds of the hand have been played
+        if(session.players[0].hand.length === 0) {
+            // Clear the board
+            session.gameState.playedCards = [];
 
-        // Determine who starts the next hand (the next player in line)
-        session.gameState.startingPlayerIndex = (session.gameState.startingPlayerIndex + 1) % session.players.length;
-        session.gameState.currentTurnIndex = session.gameState.startingPlayerIndex;
-        session.gameState.turnName = session.players[session.gameState.currentTurnIndex].name;
+            // Update hand number
+            session.gameState.currentHand++;
 
-        // Start the next hand and deal new cards
-        startGame(session, session.gameState.currentHand, session.gameState.startingPlayerIndex);
+            // Determine who starts the next hand (the next player in line)
+            session.gameState.startingPlayerIndex = (session.gameState.startingPlayerIndex + 1) % session.players.length;
+            session.gameState.currentTurnIndex = session.gameState.startingPlayerIndex;
+            session.gameState.turnName = session.players[session.gameState.currentTurnIndex].name;
 
-        // Emit the next round start event to all players
-        session.players.forEach(player => {
-            io.to(player.id).emit('nextRound', {
-                playerHand: player.hand,
-                turnName: session.gameState.turnName,
-                currentHand: session.gameState.currentHand
+            // Reset players ready for next round
+            session.playersReadyForNextRound = 0;
+
+            // Start the next hand and deal new cards
+            startGame(session, session.gameState.currentHand, session.gameState.startingPlayerIndex);
+
+            // Reset board for all players
+            io.to(sessionId).emit('reset');
+
+            // Emit the next round start event to all players
+            session.players.forEach(player => {
+                player.declaredRounds = undefined;
+                player.actualRoundsWon = 0;
+                io.to(player.id).emit('nextHand', {
+                    playerHand: player.hand,
+                    turnName: session.gameState.turnName,
+                    currentHand: session.gameState.currentHand,
+                });
             });
-        });
+        }
     } else {
         console.log(`Player with socket ID: ${socket.id} is waiting for other players.`);
-        socket.emit('waitingForPlayers', { message: 'Waiting for other players to be ready...' });
+        io.to(sessionId).emit('waitingForPlayers', { message: 'Waiting for other players to be ready...' });
     }
 };
 
