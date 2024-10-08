@@ -22,10 +22,10 @@ describe('Declaration Phase Tests', function() {
 
                 // Listen for gameStarted to find the correct player
                 clientSocket.once('gameStarted', (data) => {
-                    playerIndex = playerData.findIndex(p => p.addedToGameData.name === data.turnName);
+                    playerIndex = playerData.findIndex(p => p.playerInfo.name === data.turnName);
 
                     const firstPlayerSocket = playerData[playerIndex].socket;
-                    const playerName = playerData[playerIndex].addedToGameData.name;
+                    const playerName = playerData[playerIndex].playerInfo.name;
 
                     // Emit valid and invalid declarations sequentially
                     const emitDeclarations = () => {
@@ -88,9 +88,9 @@ describe('Declaration Phase Tests', function() {
                 let name = '';
 
                 // Find player who declares and make a valid declaration
-                playerData.forEach(({ addedToGameData, socket }, index) => {
+                playerData.forEach(({ playerInfo, socket }, index) => {
                     socket.on('gameStarted', (data) => {
-                        if (addedToGameData.players[index].name === data.turnName) {
+                        if (playerInfo.players[index].name === data.turnName) {
                             name = data.turnName;
                             // Emit declaration for the first player
                             socket.emit('declareRounds', {
@@ -142,8 +142,8 @@ describe('Declaration Phase Tests', function() {
                 let errorsReceived = 0;
 
                 // Find the first player and emit the declaration
-                playerData.forEach(({ addedToGameData, socket }, index) => {
-                    const playerName = addedToGameData.players[index].name;
+                playerData.forEach(({ playerInfo, socket }, index) => {
+                    const playerName = playerInfo.players[index].name;
 
                     socket.on('gameStarted', (data) => {
                         // The player whose turn it is should be able to declare

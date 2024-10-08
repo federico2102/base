@@ -1,5 +1,5 @@
 import { handleCreateGame, handleJoinGame, handleDeclarations, handleStartGame,
-    handleMaxCards, handlePlayCard, handlePlayerContinue } from './handlers/gameHandlers.js';
+    handleMaxCards, handlePlayCard, handlePlayerContinue, handleDestroySession } from './handlers/gameHandlers.js';
 
 const socketHandler = (io) => {
     io.on('connection', (socket) => {
@@ -38,6 +38,10 @@ const socketHandler = (io) => {
         socket.on('playerContinue', (sessionId) => {
             handlePlayerContinue(socket, sessionId, io); // Use the correct event handler
         });
+
+        // Event to destroy all the data of a session
+        socket.on('destroySession', (data) =>
+            handleDestroySession(socket, data, io));
 
         // Event for when a player disconnects
         socket.on('disconnect', () => {

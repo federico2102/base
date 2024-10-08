@@ -153,17 +153,19 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds,
 
     currentPlayer.declaredRounds = declaredRounds; // Store the declared rounds
     currentPlayer.actualRoundsWon = 0;
+
+    // Update turn
+    const nextIndex = (currentIndex + 1) % session.players.length;
+    const nextPlayer = session.players[nextIndex];
+    session.gameState.turnName = nextPlayer.name;
+    session.gameState.currentTurnIndex = nextIndex;
+
     io.to(sessionId).emit('declarationUpdated', { playerName, declaredRounds }); // Broadcast the declaration to all players
 
     // Check if all players have declared
     const allDeclared = session.players.every(p => p.declaredRounds !== undefined);
     if (allDeclared) {
         if(!testMode){
-            const nextIndex = (currentIndex + 1) % session.players.length;
-            const nextPlayer = session.players[nextIndex];
-            session.gameState.turnName = nextPlayer.name;
-            session.gameState.currentTurnIndex = nextIndex;
-
             // Set declarationsPhase off for the current session
             session.gameState.isDeclarationsPhase = false;
 
@@ -179,10 +181,6 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds,
     } else {
         if(!testMode){
             // Notify the next player that it’s their turn to declare
-            const nextIndex = (currentIndex + 1) % session.players.length;
-            const nextPlayer = session.players[nextIndex];
-            session.gameState.turnName = nextPlayer.name;
-            session.gameState.currentTurnIndex = nextIndex;
             io.to(sessionId).emit('nextDeclarationTurn', { turnName: nextPlayer.name });
         }
     }
@@ -197,10 +195,15 @@ const handlePlayCard = (socket, { sessionId, card, playerName } , io) => {
         return socket.emit('error', { message: 'Cannot play cards during declarations phase!' });
 
     const currentPlayer = session.players[session.gameState.currentTurnIndex];
+
+
     if (currentPlayer.name !== playerName) return socket.emit('error', {message: "It's not your turn!" });
 
     // Remove the played card from the current player's hand
     currentPlayer.hand = currentPlayer.hand.filter(c => c !== card);
+
+    // Broadcast the updated hand for the current player only (to remove the played card from their hand)
+    io.to(currentPlayer.id).emit('handUpdated', { playerHand: currentPlayer.hand });
 
     // Add the card to the board (played cards for the round)
     if (!session.gameState.playedCards) session.gameState.playedCards = [];
@@ -208,9 +211,6 @@ const handlePlayCard = (socket, { sessionId, card, playerName } , io) => {
 
     // Broadcast the played card to all players (update the board)
     io.to(sessionId).emit('cardPlayed', { card, playerName });
-
-    // Broadcast the updated hand for the current player only (to remove the played card from their hand)
-    io.to(currentPlayer.id).emit('handUpdated', { playerHand: currentPlayer.hand });
 
     // If all players have played, determine the winner and hold until all click continue
     if (session.gameState.playedCards.length === session.players.length) {
@@ -297,6 +297,23 @@ const handlePlayerContinue = (socket, sessionId, io) => {
     }
 };
 
+// Handler to destroy a session
+const handleDestroySession = (socket, { sessionId }, io) => {
+    if (!sessionId) {
+        return socket.emit('error', { message: 'Session ID is invalid or missing!' });
+    }
+
+    const session = sessions[sessionId];
+    if (session) {
+        delete sessions[sessionId]; // Remove the session from the sessions object
+        io.to(sessionId).emit('sessionDestroyed'); // Notify the clients that the session was destroyed
+    } else {
+        socket.emit('error', { message: 'Session not found!' });
+    }
+};
+
+
+
 // End of hand: Calculate scores based on the declarations and actual wins
 const calculateScores = (sessionId, io) => {
     const session = sessions[sessionId];
@@ -332,5 +349,6 @@ export {handleCreateGame,
     handlePlayCard,
     handlePlayerContinue,
     handleDeclarations,
+    handleDestroySession,
     calculateScores,
     endGame};

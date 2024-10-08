@@ -71,7 +71,7 @@ describe('Game Start Tests', function() {
                         expect(turnName).to.be.a('string').that.is.not.empty;
 
                         // Verify that the turnName matches one of the players' names
-                        const playerNames = playerData[3].addedToGameData.players.map(player => player.name);  // Get player names
+                        const playerNames = playerData[3].playerInfo.players.map(player => player.name);  // Get player names
                         expect(playerNames).to.include(turnName);  // Ensure that turnName is in the list of player names
 
                         done();  // Test passes if the turn is correctly assigned
@@ -99,11 +99,11 @@ describe('Game Start Tests', function() {
                 let playersProcessed = 0;  // Track how many players have received the error
 
                 // Step 2: Loop through each player and listen for the "gameStarted" event
-                playerData.forEach(({ addedToGameData, socket }, index) => {
+                playerData.forEach(({ playerInfo, socket }, index) => {
                     socket.on('gameStarted', (data) => {
                         socket.emit('playCard', {
                             sessionId, card: data.playerHand[0],
-                            playerName: addedToGameData.players[index].name
+                            playerName: playerInfo.players[index].name
                         });
 
                         // Step 3: Listen for the 'error' event

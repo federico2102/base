@@ -112,7 +112,7 @@ describe('Game Creation and Joining Tests', function() {
         createGameAndAddPlayers(io, clientSocket, 20, done)
             .then(({ sessionId, playerData }) => {
                 expect(playerData.length).to.be.equal(20);
-                expect(playerData[19].addedToGameData.players.length).to.be.equal(20)   // 1 admin, 19 players
+                expect(playerData[19].playerInfo.players.length).to.be.equal(20)   // 1 admin, 19 players
                 done();
             })
             .catch((error) => {
