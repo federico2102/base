@@ -29,7 +29,7 @@ const handleCreateGame = (socket, playerName, io) => {
     };
 
     socket.join(sessionId);
-    socket.emit('sessionCreated', { sessionId });
+    socket.emit('sessionCreated', { sessionId, playerName });
     io.to(sessionId).emit('playerListUpdated', sessions[sessionId].players); // Broadcast player list to all players
 };
 
@@ -55,7 +55,7 @@ const handleJoinGame = (socket, { playerName, code }, io) => {
     session.players.push({ name: playerName, id: socket.id, hand: [] });
     socket.join(code);
 
-    socket.emit('addedToGame', { players: session.players, maxCards: session.gameState.maxCards });
+    socket.emit('addedToGame', { players: session.players, maxCards: session.gameState.maxCards, name: playerName });
     io.to(code).emit('playerListUpdated', session.players); // Broadcast updated list to everyone else
 };
 
@@ -114,7 +114,8 @@ const handleStartGame = (socket, sessionId, io) => {
 };
 
 // Declarations phase: Players declare how many rounds they expect to win.
-const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, io) => {
+const handleDeclarations = (socket, { sessionId, playerName, declaredRounds,
+    testMode = false }, io) => {
     const session = sessions[sessionId];
     if (!session) {
         return socket.emit('error', { message: 'Session not found!' });
@@ -124,6 +125,15 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, i
     if (!currentPlayer) {
         return socket.emit('error', { message: 'Player not found!' });
     }
+
+    if (playerName !== session.gameState.turnName)
+        return socket.emit('error', { message: 'It\'s not your turn to declare!' });
+
+    const maxCardsThisHand = session.gameState.currentHand * 2 - 1;
+
+    // Make sure the declaration is valid
+    if (declaredRounds < 0 || declaredRounds > maxCardsThisHand)
+        return socket.emit('error', { message: 'Invalid declaration' });
 
     // Check if the player is the last one to declare
     const currentIndex = session.players.findIndex(p => p.name === playerName);
@@ -135,8 +145,6 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, i
     const totalDeclaredSoFar = session.players.reduce((total, player) => {
         return player.declaredRounds !== undefined ? total + player.declaredRounds : total;
     }, 0);
-
-    const maxCardsThisHand = session.gameState.currentHand * 2 - 1;
 
     // Restrict the last player from declaring a number that makes the total equal to max cards
     if (isLastPlayer && (totalDeclaredSoFar + declaredRounds === maxCardsThisHand)) {
@@ -150,26 +158,33 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds }, i
     // Check if all players have declared
     const allDeclared = session.players.every(p => p.declaredRounds !== undefined);
     if (allDeclared) {
-        const nextIndex = (currentIndex + 1) % session.players.length;
-        const nextPlayer = session.players[nextIndex];
-        session.gameState.turnName = nextPlayer.name;
-        session.gameState.currentTurnIndex = nextIndex;
+        if(!testMode){
+            const nextIndex = (currentIndex + 1) % session.players.length;
+            const nextPlayer = session.players[nextIndex];
+            session.gameState.turnName = nextPlayer.name;
+            session.gameState.currentTurnIndex = nextIndex;
 
-        io.to(sessionId).emit('allDeclarationsMade', {  // Notify all player that declarations phase is over
-            turnName: session.gameState.turnName,  // First player to declare starts the round
-            currentHand: session.gameState.currentHand
-        });
-       /* io.to(sessionId).emit('nextTurn', {
-            turnName: session.gameState.turnName,  // First player to declare starts the round
-            currentHand: session.gameState.currentHand
-        });*/
+            // Set declarationsPhase off for the current session
+            session.gameState.isDeclarationsPhase = false;
+
+            io.to(sessionId).emit('allDeclarationsMade', {  // Notify all players that declarations phase is over
+                turnName: session.gameState.turnName,  // First player to declare starts the round
+                currentHand: session.gameState.currentHand
+            });
+            /* io.to(sessionId).emit('nextTurn', {
+                 turnName: session.gameState.turnName,  // First player to declare starts the round
+                 currentHand: session.gameState.currentHand
+             });*/
+        }
     } else {
-        // Notify the next player that it’s their turn to declare
-        const nextIndex = (currentIndex + 1) % session.players.length;
-        const nextPlayer = session.players[nextIndex];
-        session.gameState.turnName = nextPlayer.name;
-        session.gameState.currentTurnIndex = nextIndex;
-        io.to(sessionId).emit('nextDeclarationTurn', { turnName: nextPlayer.name });
+        if(!testMode){
+            // Notify the next player that it’s their turn to declare
+            const nextIndex = (currentIndex + 1) % session.players.length;
+            const nextPlayer = session.players[nextIndex];
+            session.gameState.turnName = nextPlayer.name;
+            session.gameState.currentTurnIndex = nextIndex;
+            io.to(sessionId).emit('nextDeclarationTurn', { turnName: nextPlayer.name });
+        }
     }
 };
 

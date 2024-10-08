@@ -32,7 +32,11 @@ function createGameAndAddPlayers(io, clientSocket, numPlayers) {
                 // If there's only the admin, resolve immediately
                 resolve({ sessionId, playerData });
             } else {
-                // Step 2: Add players if there are more than just the admin
+                // Step 2: Add the admin to playerData
+                const adminData = { players: [{ name: 'Player0' }], name: 'Player0' };
+                playerData.push({ addedToGameData: adminData, socket: clientSocket });
+
+                // Step 3: Add other players
                 let playersJoined = 0;
                 newPlayers.forEach((player) => {
                     const playerSocket = io.connect('http://localhost:4000');
@@ -58,6 +62,7 @@ function createGameAndAddPlayers(io, clientSocket, numPlayers) {
         });
     });
 }
+
 
 
 export {setUpConnection, createGameAndAddPlayers};
