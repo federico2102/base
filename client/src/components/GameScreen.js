@@ -127,6 +127,11 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             setWaitingMessage(message);
         });
 
+        // End of game
+        socket.on('gameOver', ({ winner, score }) => {
+           console.log('Game Over');
+        });
+
         socket.on('error', (error) => {
             alert(error.message); // Show the error message for invalid declarations
         });

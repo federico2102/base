@@ -219,8 +219,12 @@ const handlePlayCard = (socket, { sessionId, card, playerName } , io) => {
         // Set round winner to know who starts the next round (if there are more rounds left in the hand)
         session.roundWinner = winningPlayer;
 
-        // Broadcast the complete board and winner to all players
-        io.to(sessionId).emit('roundFinished', { winner: winningPlayer, roundsWon: roundsWon });
+        // If that was the last hand, calculate the game winner and finish the game
+        if(session.gameState.currentHand === session.gameState.maxCards+1)
+            endGame(session, sessionId, io);
+        else
+            // Broadcast the complete board and winner to all players
+            io.to(sessionId).emit('roundFinished', { winner: winningPlayer, roundsWon: roundsWon });
 
     } else {
         // Move to the next player in a circular manner
@@ -244,7 +248,7 @@ const handlePlayerContinue = (socket, sessionId, playerName, io) => {
         return;
     }
 
-    console.log(`Player with socket ID: ${socket.id} clicked continue for session ${sessionId}`);
+    //console.log(`Player with socket ID: ${socket.id} clicked continue for session ${sessionId}`);
 
     // Set current player as ready
     session.players.find(p => p.name === playerName).readyForNextRound = true;
