@@ -67,6 +67,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
                 turnName: turnName,
                 currentHand: currentHand,
             }));
+            setWaitingMessage(''); // Clear waiting message
             setBoardCards(playedCards); // Update board
             setIsMyTurn(turnName === myName); // Update the turn for playing cards
         });
@@ -92,7 +93,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             setRoundFinished(true); // Set round as complete and display the winner
         });
 
-        socket.on('resetAndNextHand', ({ playerHand, turnName, currentHand }) => {
+        socket.on('resetAndNextHand', ({ playerHand, turnName, currentHand, maxDeclaration }) => {
             console.log("Received new round data:", { playerHand, turnName, currentHand });
 
             // Directly set the new game state without relying on prevState for these values
@@ -112,7 +113,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             setActualRoundsWon(0); // Reset actual rounds won
             setRoundFinished(false); // Reset round finished state
             setIsDeclarationPhase(true); // Reset to declaration phase
-            setMaxDeclaration(currentHand * 2 - 1);
+            setMaxDeclaration(maxDeclaration);
             setIsMyTurn(turnName === myName); // Update turn state
         });
 

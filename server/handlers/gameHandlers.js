@@ -128,7 +128,7 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds,
     if (playerName !== session.gameState.turnName)
         return socket.emit('error', { message: 'It\'s not your turn to declare!' });
 
-    const maxCardsThisHand = session.gameState.currentHand * 2 - 1;
+    const maxCardsThisHand = currentPlayer.hand.length;
 
     // Make sure the declaration is valid
     if (declaredRounds < 0 || declaredRounds > maxCardsThisHand)
@@ -245,7 +245,7 @@ const handlePlayerContinue = (socket, sessionId, playerName, io) => {
 
     console.log(`Player with socket ID: ${socket.id} clicked continue for session ${sessionId}`);
 
-    // Mark current player as ready
+    // Set current player as ready
     session.players.find(p => p.name === playerName).readyForNextRound = true;
 
     // Check if all players are ready
@@ -264,7 +264,7 @@ const handlePlayerContinue = (socket, sessionId, playerName, io) => {
         // Reset players ready for next round
         session.players.forEach((player) => {
             player.readyForNextRound = false;
-        })
+        });
 
         // If all the rounds of the hand have been played
         if(session.players[0].hand.length === 0) {
@@ -286,10 +286,13 @@ const handlePlayerContinue = (socket, sessionId, playerName, io) => {
 
             // Emit reset and next hand info in one go to all players
             session.players.forEach(player => {
+                player.declaredRounds = undefined; // Clear declarations
+                player.actualRoundsWon = 0;
                 io.to(player.id).emit('resetAndNextHand', {
                     playerHand: player.hand,
                     turnName: session.gameState.turnName,
-                    currentHand: session.gameState.currentHand
+                    currentHand: session.gameState.currentHand,
+                    maxDeclaration: player.hand.length,
                 });
             });
 
