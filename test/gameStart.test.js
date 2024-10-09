@@ -71,7 +71,7 @@ describe('Game Start Tests', function() {
                         expect(turnName).to.be.a('string').that.is.not.empty;
 
                         // Verify that the turnName matches one of the players' names
-                        const playerNames = playerData[3].playerInfo.players.map(player => player.name);  // Get player names
+                        const playerNames = playerData[4].playerInfo.players.map(player => player.name);  // Get player names
                         expect(playerNames).to.include(turnName);  // Ensure that turnName is in the list of player names
 
                         done();  // Test passes if the turn is correctly assigned

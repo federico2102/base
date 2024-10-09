@@ -33,7 +33,8 @@ function createGameAndAddPlayers(io, clientSocket, numPlayers) {
                 resolve({ sessionId, playerData });
             } else {
                 // Step 2: Add the admin to playerData
-                const adminData = { players: [{ name: 'Player0' }], name: 'Player0' };
+                const adminData = { players: [{ name: 'Player0',
+                        id: clientSocket.id, hand: [] }], name: 'Player0' };
                 playerData.push({ playerInfo: adminData, socket: clientSocket });
 
                 // Step 3: Add other players

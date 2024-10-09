@@ -155,10 +155,12 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds,
     currentPlayer.actualRoundsWon = 0;
 
     // Update turn
-    const nextIndex = (currentIndex + 1) % session.players.length;
-    const nextPlayer = session.players[nextIndex];
-    session.gameState.turnName = nextPlayer.name;
-    session.gameState.currentTurnIndex = nextIndex;
+        const nextIndex = (currentIndex + 1) % session.players.length;
+        const nextPlayer = session.players[nextIndex];
+    if(!testMode) {
+        session.gameState.turnName = nextPlayer.name;
+        session.gameState.currentTurnIndex = nextIndex;
+    }
 
     io.to(sessionId).emit('declarationUpdated', { playerName, declaredRounds }); // Broadcast the declaration to all players
 
@@ -179,10 +181,8 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds,
              });*/
         }
     } else {
-        if(!testMode){
             // Notify the next player that it’s their turn to declare
             io.to(sessionId).emit('nextDeclarationTurn', { turnName: nextPlayer.name });
-        }
     }
 };
 
