@@ -20,6 +20,8 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
     const [declaredRounds, setDeclaredRounds] = useState(''); // Input for declarations
     const [actualRoundsWon, setActualRoundsWon] = useState(0);
     const [maxDeclaration, setMaxDeclaration] = useState(gameState.currentHand * 2 - 1); // Max cards in the hand
+    const [gameWinner, setGameWinner] = useState(null);
+    const [isGameOver, setIsGameOver] = useState(false);
 
     // Transition from declaration phase to game playing phase
     useEffect(() => {
@@ -128,8 +130,10 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
         });
 
         // End of game
-        socket.on('gameOver', ({ winner, score }) => {
-           console.log('Game Over');
+        socket.on('gameOver', ({ winner, scoreboard }) => {
+            setIsGameOver(true); // Set game as over
+            setGameWinner(winner); // Set the overall game winner
+            setScoreboard(scoreboard); // Set the final scoreboard
         });
 
         socket.on('error', (error) => {
@@ -146,6 +150,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             socket.off('roundFinished');
             socket.off('resetAndNextHand');
             socket.off('waitingForPlayers');
+            socket.off('gameOver');
             socket.off('error');
         };
     }, [socket]);
@@ -167,6 +172,41 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
         console.log(`Player is emitting playerContinue for session: ${sessionId}`);
         socket.emit('playerContinue', sessionId, myName);
     };
+
+    if (isGameOver) {
+        // Display final game over screen
+        return (
+            <div style={{ textAlign: 'center', marginTop: '50px' }}>
+                <h1>🎉 {gameWinner} Wins the Game! 🎉</h1>
+
+                <h3>Final Board (Last Hand Played)</h3>
+                <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center' }}>
+                    {boardCards.map((item, index) => (
+                        <div key={index} style={{ marginRight: '10px' }}>
+                            <Card value={item.card} />
+                            <p>Played by: {item.playerName}</p>
+                        </div>
+                    ))}
+                </div>
+
+                <h3>Declarations (Last Round)</h3>
+                {Object.keys(declarations).map((playerName) => (
+                    <p key={playerName}>
+                        {playerName}: {declarations[playerName]} rounds declared / {roundsWon[playerName]} rounds won
+                    </p>
+                ))}
+
+                <h3>Final Scoreboard</h3>
+                <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center' }}>
+                    {Object.keys(scoreboard).map((playerName) => (
+                        <div key={playerName} style={{ marginRight: '10px' }}>
+                            <p>{playerName}: {scoreboard[playerName]}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div>

@@ -24,7 +24,7 @@ const endGame = (session, sessionId, io) => {
 
     const winner = session.players.reduce((maxPlayer, player) =>
         player.score > maxPlayer.score ? player : maxPlayer, session.players[0]);
-    io.to(sessionId).emit('gameOver', { winner: winner.name, score: winner.score });
+    io.to(sessionId).emit('gameOver', { winner: winner.name, scoreboard: session.gameState.scoreboard });
 };
 
 export { calculateScores, endGame };
