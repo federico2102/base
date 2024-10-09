@@ -13,6 +13,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
     const [declarations, setDeclarations] = useState({});
     const [roundsWon, setRoundsWon] = useState({});
     const [boardCards, setBoardCards] = useState([]);
+    const [scoreboard, setScoreboard] = useState({});
     const [roundFinished, setRoundFinished] = useState(false);
     const [winner, setWinner] = useState(null);
     const [waitingMessage, setWaitingMessage] = useState('');
@@ -67,6 +68,8 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
                 turnName: turnName,
                 currentHand: currentHand,
             }));
+            setWinner(null); // Clear winner
+            setRoundFinished(false); // Reset round finished state
             setWaitingMessage(''); // Clear waiting message
             setBoardCards(playedCards); // Update board
             setIsMyTurn(turnName === myName); // Update the turn for playing cards
@@ -93,7 +96,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             setRoundFinished(true); // Set round as complete and display the winner
         });
 
-        socket.on('resetAndNextHand', ({ playerHand, turnName, currentHand, maxDeclaration }) => {
+        socket.on('resetAndNextHand', ({ playerHand, turnName, currentHand, maxDeclaration, scoreboard }) => {
             console.log("Received new round data:", { playerHand, turnName, currentHand });
 
             // Directly set the new game state without relying on prevState for these values
@@ -113,10 +116,13 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
             setActualRoundsWon(0); // Reset actual rounds won
             setRoundFinished(false); // Reset round finished state
             setIsDeclarationPhase(true); // Reset to declaration phase
+            console.log(scoreboard);
+            setScoreboard(scoreboard); // Update scoreboard
             setMaxDeclaration(maxDeclaration);
             setIsMyTurn(turnName === myName); // Update turn state
         });
 
+        // Set waiting message while player waits for others to be ready
         socket.on('waitingForPlayers', ({ message }) => {
             setWaitingMessage(message);
         });
@@ -164,7 +170,7 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
 
             <div>
                 <h3>Your Cards</h3>
-                <div style={{ display: 'flex', flexDirection: 'row' }}>
+                <div style={{display: 'flex', flexDirection: 'row'}}>
                     {gameState.playerHand.map((card, index) => (
                         <Card
                             key={index}
@@ -209,10 +215,10 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
 
             <div>
                 <h3>Board (Played Cards)</h3>
-                <div style={{ display: 'flex', flexDirection: 'row' }}>
+                <div style={{display: 'flex', flexDirection: 'row'}}>
                     {boardCards.map((item, index) => (
-                        <div key={index} style={{ marginRight: '10px' }}>
-                            <Card value={item.card} />
+                        <div key={index} style={{marginRight: '10px'}}>
+                            <Card value={item.card}/>
                             <p>Played by: {item.playerName}</p>
                         </div>
                     ))}
@@ -238,8 +244,13 @@ const GameScreen = ({ sessionId, playerHand, turnName, currentHand, myName, sock
 
             <div>
                 <h3>Global Scoreboard</h3>
-                {/* Display the global scoreboard */}
+                {Object.keys(scoreboard).map((playerName) => (
+                    <p key={playerName}>
+                        {playerName}: {scoreboard[playerName]}
+                    </p>
+                ))}
             </div>
+
         </div>
     );
 };

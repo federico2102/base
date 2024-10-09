@@ -1,6 +1,7 @@
-import { startGame, getRandomPlayer } from '../game/game.js';
+import { initializeHand, getRandomPlayer } from '../game/gameSetup.js';
 import { calculateDecksRequired } from '../utils/deckUtils.js';
-import { determineRoundWinner } from '../game/gameLogic.js';
+import { determineRoundWinner } from '../game/roundLogic.js';
+import { calculateScores, endGame } from "../game/gameResults.js";
 
 const sessions = {};
 
@@ -21,6 +22,7 @@ const handleCreateGame = (socket, playerName, io) => {
             currentTurnIndex: 0,
             decksRequired: 1,
             playedCards: [],
+            scoreboard: {},
             startingPlayerIndex: 0,
             isDeclarationsPhase: true,
             roundWinner: ''
@@ -99,7 +101,7 @@ const handleStartGame = (socket, sessionId, io) => {
     session.gameState.startingPlayerIndex = session.gameState.currentTurnIndex;
     session.gameState.currentHand++;
 
-    startGame(session, session.gameState.currentHand);
+    initializeHand(session, session.gameState.currentHand);
 
     // Emit the game start event to all players
     session.players.forEach(player => {
@@ -200,7 +202,6 @@ const handlePlayCard = (socket, { sessionId, card, playerName } , io) => {
     io.to(currentPlayer.id).emit('handUpdated', currentPlayer.hand);
 
     // Add the card to the board (played cards for the round)
-    if (!session.gameState.playedCards) session.gameState.playedCards = [];
     session.gameState.playedCards.push({ playerName, card });
 
     // Broadcast the played card to all players (update the board)
@@ -270,6 +271,9 @@ const handlePlayerContinue = (socket, sessionId, playerName, io) => {
         if(session.players[0].hand.length === 0) {
             console.log('Starting new hand...');
 
+            // Calculate and update each player's scores
+            calculateScores(session, io);
+
             // Determine who starts the next hand (the next player in line)
             session.gameState.startingPlayerIndex = (session.gameState.startingPlayerIndex + 1) % session.players.length;
             session.gameState.currentTurnIndex = session.gameState.startingPlayerIndex;
@@ -282,17 +286,16 @@ const handlePlayerContinue = (socket, sessionId, playerName, io) => {
             session.gameState.currentHand++;
 
             // Start the next hand and deal new cards
-            startGame(session, session.gameState.currentHand);
+            initializeHand(session, session.gameState.currentHand);
 
             // Emit reset and next hand info in one go to all players
             session.players.forEach(player => {
-                player.declaredRounds = undefined; // Clear declarations
-                player.actualRoundsWon = 0;
                 io.to(player.id).emit('resetAndNextHand', {
                     playerHand: player.hand,
                     turnName: session.gameState.turnName,
                     currentHand: session.gameState.currentHand,
                     maxDeclaration: player.hand.length,
+                    scoreboard: session.gameState.scoreboard
                 });
             });
 
@@ -330,36 +333,6 @@ const handleDestroySession = (socket, { sessionId }, io) => {
     }
 };
 
-
-
-// End of hand: Calculate scores based on the declarations and actual wins
-const calculateScores = (sessionId, io) => {
-    const session = sessions[sessionId];
-    if (!session) return;
-
-    session.players.forEach(player => {
-        const { declaredRounds, actualRoundsWon } = player;
-        if (declaredRounds === actualRoundsWon) {
-            player.score += 10 + actualRoundsWon;
-        } else {
-            player.score += actualRoundsWon;
-        }
-        player.declaredRounds = undefined;  // Reset for the next hand
-        player.actualRoundsWon = 0;  // Reset after score is calculated
-    });
-
-    io.to(sessionId).emit('scoresUpdated', session.players);  // Broadcast updated scores to everyone
-};
-
-// End of game logic: Show final scoreboard and determine the winner
-const endGame = (sessionId, io) => {
-    const session = sessions[sessionId];
-    if (!session) return;
-
-    const winner = session.players.reduce((maxPlayer, player) => player.score > maxPlayer.score ? player : maxPlayer, session.players[0]);
-    io.to(sessionId).emit('gameOver', { players: session.players, winner });
-};
-
 export {handleCreateGame,
     handleJoinGame,
     handleMaxCards,
@@ -368,5 +341,4 @@ export {handleCreateGame,
     handlePlayerContinue,
     handleDeclarations,
     handleDestroySession,
-    calculateScores,
-    endGame};
+    };
