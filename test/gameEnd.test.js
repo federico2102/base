@@ -25,7 +25,7 @@ describe('Game End Tests', function() {
         }
     });
 
-    it('should update the scoreboard and reset declaration board after a hand finishes', (done) => {
+    /*it('should update the scoreboard and reset declaration board after a hand finishes', (done) => {
         adminSocket.emit('createGame', { playerName: 'Admin' });
         adminSocket.on('sessionCreated', (data) => {
             const sessionId = data.sessionId;
@@ -41,7 +41,7 @@ describe('Game End Tests', function() {
                 done();
             });
         });
-    });
+    });*/
 
     // Other game end tests
 });

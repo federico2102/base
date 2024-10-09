@@ -35,8 +35,8 @@ const socketHandler = (io) => {
         });
 
         // Event to know when all players are ready to move on to the next round
-        socket.on('playerContinue', (sessionId) => {
-            handlePlayerContinue(socket, sessionId, io); // Use the correct event handler
+        socket.on('playerContinue', (sessionId, playerName) => {
+            handlePlayerContinue(socket, sessionId, playerName, io); // Use the correct event handler
         });
 
         // Event to destroy all the data of a session

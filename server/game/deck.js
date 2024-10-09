@@ -24,9 +24,9 @@ function shuffleDeck(deck) {
 function dealCards(deck, numPlayers, numCardsPerPlayer) {
     const hands = {};
     for (let i = 0; i < numPlayers; i++) {
-        hands[`player${i + 1}`] = [];
+        hands[i] = [];
         for (let j = 0; j < numCardsPerPlayer; j++) {
-            hands[`player${i + 1}`].push(deck.pop());
+            hands[i].push(deck.pop());
         }
     }
     return hands;
