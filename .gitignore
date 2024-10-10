@@ -1,0 +1,55 @@
+# Node.js dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build directories
+/dist/
+client/build/
+server/build/
+client/dist/
+server/dist/
+
+# Cache and coverage
+/.cache/
+coverage/
+client/.cache/
+server/.cache/
+client/coverage/
+server/coverage/
+
+# Environment settings
+.env
+.env.local
+.env.*.local
+
+# Editor-specific files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# MacOS system files
+.DS_Store
+
+# Lockfiles
+package-lock.json
+yarn.lock
+
+# Ignore any additional testing or temporary files
+test-results/
+*.tmp
+*.swp
+
+# ESLint cache
+.eslintcache
+
+# Ignore compiled output if using TypeScript
+/*.tsbuildinfo
