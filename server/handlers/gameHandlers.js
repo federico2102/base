@@ -1,87 +1,40 @@
+import { getSession } from '../game/sessionManager.js';
 import { initializeHand, getRandomPlayer } from '../game/gameSetup.js';
 import { calculateDecksRequired } from '../utils/deckUtils.js';
 import { determineRoundWinner } from '../game/roundLogic.js';
 import { calculateScores, endGame } from "../game/gameResults.js";
+import { getSessionOrEmitError, getPlayerOrEmitError } from "../utils/validationUtils.js";
+import {
+    broadcastAllDeclarationsMade,
+    broadcastCardPlayed,
+    broadcastDeclarationUpdate,
+    broadcastGameStart,
+    broadcastHandUpdate, broadcastMaxCardsUpdated,
+    broadcastNextDeclarationTurn,
+    broadcastNextTurn,
+    broadcastResetAndNextHand,
+    broadcastRoundFinished, broadcastWaitingMessage
+} from "../utils/broadcastUtils.js";
+import {allRoundsPlayed, getNextTurnIndex, resetPlayerReadyStatus} from "../utils/stateUtils.js";
+import {errorMessages} from "../utils/messageUtils.js";
 
-const sessions = {};
-
-const handleCreateGame = (socket, playerName, io) => {
-    const sessionId = Math.random().toString(36).substring(2, 8);
-    // console.log(`Game created by ${playerName} with session ID: ${sessionId}`);
-    if (playerName === '') {
-        return socket.emit('error', { message: 'Name cannot be blank!' });
-    }
-
-    sessions[sessionId] = {
-        admin: playerName,
-        players: [{ name: playerName, id: socket.id, hand: [] }],
-        gameState: {
-            turnName: null,
-            currentHand: 0,
-            maxCards: 1,
-            currentTurnIndex: 0,
-            decksRequired: 1,
-            playedCards: [],
-            scoreboard: {},
-            startingPlayerIndex: 0,
-            isDeclarationsPhase: true,
-            roundWinner: ''
-        },
-        started: false
-    };
-
-    socket.join(sessionId);
-    socket.emit('sessionCreated', { sessionId, playerName });
-    io.to(sessionId).emit('playerListUpdated', sessions[sessionId].players); // Broadcast player list to all players
-};
-
-const handleJoinGame = (socket, { playerName, code }, io) => {
-    if (playerName === '' || code === '') {
-        return socket.emit('error', {message: 'Name and session code cannot be blank!'});
-    }
-
-    const session = sessions[code];
-    if (!session) {
-        return socket.emit('error', { message: 'Session not found!' });
-    }
-
-    if (session.started) {
-        return socket.emit('error', { message: 'Game has already started, you cannot join.' });
-    }
-
-    const playerExists = session.players.find(p => p.name === playerName);
-    if (playerExists) {
-        return socket.emit('error', { message: 'Player name already exists in the session.' });
-    }
-
-    session.players.push({ name: playerName, id: socket.id, hand: [] });
-    socket.join(code);
-
-    socket.emit('addedToGame', { players: session.players, maxCards: session.gameState.maxCards, name: playerName });
-    io.to(code).emit('playerListUpdated', session.players); // Broadcast updated list to everyone else
-};
-
-const handleMaxCards = (socket, maxCards, sessionId, io) => {
-    const session = sessions[sessionId];
-
-    if (!session) {
-        console.error('Session not found for admin socket ID:', socket.id);
-        return socket.emit('error', { message: 'Session not found!' });
-    }
+export const handleMaxCards = (socket, maxCards, sessionId, io) => {
+    const session = getSessionOrEmitError(sessionId, socket, io);
+    if (!session) return;
 
     if (typeof maxCards !== 'number') {
-        console.error('Invalid maxCards value:', maxCards);
-        return socket.emit('error', { message: 'Invalid maxCards value!' });
+        return socket.emit('error', { message: errorMessages.invalidMaxCards });
     }
 
     session.gameState.maxCards = maxCards;
 
-    io.to(sessionId).emit('maxCardsUpdated', maxCards);  // Broadcast the update to all players
+    // Broadcast the update to all players
+    broadcastMaxCardsUpdated(io, sessionId, maxCards);
 }
 
-const handleStartGame = (socket, sessionId, io) => {
-    const session = sessions[sessionId];
-    if (!session || session.players.length === 0) return socket.emit('error', { message: 'No players to start the game.' });
+export const handleStartGame = (socket, sessionId, io) => {
+    const session = getSessionOrEmitError(sessionId, socket, io);
+    if (!session) return;
 
     session.started = true;
     const numPlayers = session.players.length;
@@ -104,37 +57,26 @@ const handleStartGame = (socket, sessionId, io) => {
     initializeHand(session, session.gameState.currentHand);
 
     // Emit the game start event to all players
-    session.players.forEach(player => {
-        io.to(player.id).emit('gameStarted', {
-            playerHand: player.hand,
-            turnName: session.gameState.turnName,
-            currentHand: session.gameState.currentHand,
-            sessionId
-        });
-    });
+    broadcastGameStart(io, sessionId, session);
 };
 
 // Declarations phase: Players declare how many rounds they expect to win.
-const handleDeclarations = (socket, { sessionId, playerName, declaredRounds,
+export const handleDeclarations = (socket, { sessionId, playerName, declaredRounds,
     testMode = false }, io) => {
-    const session = sessions[sessionId];
-    if (!session) {
-        return socket.emit('error', { message: 'Session not found!' });
-    }
+    const session = getSessionOrEmitError(sessionId, socket, io);
+    if (!session) return;
 
-    const currentPlayer = session.players.find(p => p.name === playerName);
-    if (!currentPlayer) {
-        return socket.emit('error', { message: 'Player not found!' });
-    }
+    const currentPlayer = getPlayerOrEmitError(playerName, session, socket);
+    if(!currentPlayer) return;
 
     if (playerName !== session.gameState.turnName)
-        return socket.emit('error', { message: 'It\'s not your turn to declare!' });
+        return socket.emit('error', { message: errorMessages.notYourTurn });
 
     const maxCardsThisHand = currentPlayer.hand.length;
 
     // Make sure the declaration is valid
     if (declaredRounds < 0 || declaredRounds > maxCardsThisHand)
-        return socket.emit('error', { message: 'Invalid declaration' });
+        return socket.emit('error', { message: errorMessages.invalidDeclaration });
 
     // Check if the player is the last one to declare
     const currentIndex = session.players.findIndex(p => p.name === playerName);
@@ -149,21 +91,22 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds,
 
     // Restrict the last player from declaring a number that makes the total equal to max cards
     if (isLastPlayer && (totalDeclaredSoFar + declaredRounds === maxCardsThisHand)) {
-        return socket.emit('error', { message: "Your declaration cannot make the total equal to the number of cards in this hand." });
+        return socket.emit('error', { message: errorMessages.lastPlayerRestriction });
     }
 
     currentPlayer.declaredRounds = declaredRounds; // Store the declared rounds
     currentPlayer.actualRoundsWon = 0;
 
     // Update turn
-        const nextIndex = (currentIndex + 1) % session.players.length;
+        const nextIndex = getNextTurnIndex(currentIndex, session.players.length);
         const nextPlayer = session.players[nextIndex];
     if(!testMode) {
         session.gameState.turnName = nextPlayer.name;
         session.gameState.currentTurnIndex = nextIndex;
     }
 
-    io.to(sessionId).emit('declarationUpdated', { playerName, declaredRounds }); // Broadcast the declaration to all players
+    // Broadcast the declaration to all players
+    broadcastDeclarationUpdate(io, sessionId, playerName, declaredRounds);
 
     // Check if all players have declared
     const allDeclared = session.players.every(p => p.declaredRounds !== undefined);
@@ -172,40 +115,38 @@ const handleDeclarations = (socket, { sessionId, playerName, declaredRounds,
             // Set declarationsPhase off for the current session
             session.gameState.isDeclarationsPhase = false;
 
-            io.to(sessionId).emit('allDeclarationsMade', {  // Notify all players that declarations phase is over
-                turnName: session.gameState.turnName,  // First player to declare starts the round
-                currentHand: session.gameState.currentHand
-            });
+            // Notify all players that declarations phase is over and start the round
+            broadcastAllDeclarationsMade(io, sessionId, session);
         }
     } else {
             // Notify the next player that it’s their turn to declare
-            io.to(sessionId).emit('nextDeclarationTurn', { turnName: nextPlayer.name });
+            broadcastNextDeclarationTurn(io, sessionId, nextPlayer.name);
     }
 };
 
-const handlePlayCard = (socket, { sessionId, card, playerName } , io) => {
-    const session = sessions[sessionId];
-    if (!session) return socket.emit('error', {message: 'Session not found!' });
+export const handlePlayCard = (socket, { sessionId, card, playerName } , io) => {
+    const session = getSessionOrEmitError(sessionId, socket, io);
+    if (!session) return;
 
     // Player can only play a card if it's not declarations phase
     if (session.gameState.isDeclarationsPhase)
-        return socket.emit('error', { message: 'Cannot play cards during declarations phase!' });
+        return socket.emit('error', { message: errorMessages.canOnlyDeclare });
 
     const currentPlayer = session.players[session.gameState.currentTurnIndex];
 
-    if (currentPlayer.name !== playerName) return socket.emit('error', {message: "It's not your turn!" });
+    if (currentPlayer.name !== playerName) return socket.emit('error', {message: errorMessages.notYourTurn });
 
     // Remove the played card from the current player's hand
     currentPlayer.hand = currentPlayer.hand.filter(c => c !== card);
 
     // Broadcast the updated hand for the current player only (to remove the played card from their hand)
-    io.to(currentPlayer.id).emit('handUpdated', currentPlayer.hand);
+    broadcastHandUpdate(io, currentPlayer.id, currentPlayer.hand);
 
     // Add the card to the board (played cards for the round)
     session.gameState.playedCards.push({ playerName, card });
 
     // Broadcast the played card to all players (update the board)
-    io.to(sessionId).emit('cardPlayed', session.gameState.playedCards);
+    broadcastCardPlayed(io, sessionId, session.gameState.playedCards);
 
     // If all players have played, determine the winner and hold until all click continue
     if (session.gameState.playedCards.length === session.players.length) {
@@ -220,7 +161,7 @@ const handlePlayCard = (socket, { sessionId, card, playerName } , io) => {
         session.roundWinner = winningPlayer;
 
         // Broadcast the complete board and winner to all players
-        io.to(sessionId).emit('roundFinished', { winner: winningPlayer, roundsWon: roundsWon });
+        broadcastRoundFinished(io, sessionId, winningPlayer, roundsWon);
 
         // If that was the last hand, calculate the game winner and finish the game
         if(session.gameState.currentHand === session.gameState.maxCards+1){
@@ -230,25 +171,19 @@ const handlePlayCard = (socket, { sessionId, card, playerName } , io) => {
 
     } else {
         // Move to the next player in a circular manner
-        session.gameState.currentTurnIndex = (session.gameState.currentTurnIndex + 1) % session.players.length;
+        session.gameState.currentTurnIndex =
+            getNextTurnIndex(session.gameState.currentTurnIndex, session.players.length);
         const nextPlayer = session.players[session.gameState.currentTurnIndex];
         session.gameState.turnName = nextPlayer.name;
 
         // Broadcast to all players whose turn it is now
-        io.to(sessionId).emit('nextTurn', {
-            turnName: session.gameState.turnName,
-            currentHand: session.gameState.currentHand,
-            playedCards: session.gameState.playedCards
-        });
+        broadcastNextTurn(io, sessionId, session);
     }
 };
 
-const handlePlayerContinue = (socket, sessionId, playerName, io) => {
-    const session = sessions[sessionId];
-    if (!session) {
-        console.log("Session not found for continue event.");
-        return;
-    }
+export const handlePlayerContinue = (socket, sessionId, playerName, io) => {
+    const session = getSessionOrEmitError(sessionId, socket, io);
+    if (!session) return;
 
     //console.log(`Player with socket ID: ${socket.id} clicked continue for session ${sessionId}`);
 
@@ -269,19 +204,18 @@ const handlePlayerContinue = (socket, sessionId, playerName, io) => {
         session.gameState.playedCards = [];
 
         // Reset players ready for next round
-        session.players.forEach((player) => {
-            player.readyForNextRound = false;
-        });
+        resetPlayerReadyStatus(session)
 
         // If all the rounds of the hand have been played
-        if(session.players[0].hand.length === 0) {
+        if(allRoundsPlayed(session)) {
             console.log('Starting new hand...');
 
             // Calculate and update each player's scores
             calculateScores(session, io);
 
             // Determine who starts the next hand (the next player in line)
-            session.gameState.startingPlayerIndex = (session.gameState.startingPlayerIndex + 1) % session.players.length;
+            session.gameState.startingPlayerIndex =
+                getNextTurnIndex(session.gameState.startingPlayerIndex, session.players.length);
             session.gameState.currentTurnIndex = session.gameState.startingPlayerIndex;
             session.gameState.turnName = session.players[session.gameState.currentTurnIndex].name;
 
@@ -295,16 +229,7 @@ const handlePlayerContinue = (socket, sessionId, playerName, io) => {
             initializeHand(session, session.gameState.currentHand);
 
             // Emit reset and next hand info in one go to all players
-            session.players.forEach(player => {
-                io.to(player.id).emit('resetAndNextHand', {
-                    playerHand: player.hand,
-                    turnName: session.gameState.turnName,
-                    currentHand: session.gameState.currentHand,
-                    maxDeclaration: player.hand.length,
-                    scoreboard: session.gameState.scoreboard
-                });
-            });
-
+            broadcastResetAndNextHand(io, session);
 
         } else {
             console.log('Starting new round...');
@@ -312,39 +237,10 @@ const handlePlayerContinue = (socket, sessionId, playerName, io) => {
                 .findIndex(player => player.name === session.roundWinner);
             session.gameState.turnName = session.roundWinner;
 
-            io.to(sessionId).emit('nextTurn', {
-                turnName: session.gameState.turnName,
-                currentHand: session.gameState.currentHand,
-                playedCards: session.gameState.playedCards
-            });
+            broadcastNextTurn(io, sessionId, session);
         }
     } else {
         console.log(`Player with socket ID: ${socket.id} is waiting for other players.`);
-        io.to(socket.id).emit('waitingForPlayers', { message: 'Waiting for other players to be ready...' });
+        broadcastWaitingMessage(io, socket.id);
     }
 };
-
-// Handler to destroy a session
-const handleDestroySession = (socket, { sessionId }, io) => {
-    if (!sessionId) {
-        return socket.emit('error', { message: 'Session ID is invalid or missing!' });
-    }
-
-    const session = sessions[sessionId];
-    if (session) {
-        delete sessions[sessionId]; // Remove the session from the sessions object
-        io.to(sessionId).emit('sessionDestroyed'); // Notify the clients that the session was destroyed
-    } else {
-        socket.emit('error', { message: 'Session not found!' });
-    }
-};
-
-export {handleCreateGame,
-    handleJoinGame,
-    handleMaxCards,
-    handleStartGame,
-    handlePlayCard,
-    handlePlayerContinue,
-    handleDeclarations,
-    handleDestroySession,
-    };

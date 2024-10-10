@@ -1,6 +1,6 @@
 import { createDeck, shuffleDeck, dealCards } from './deck.js';
 
-const initializeHand = (session, currentHand) => {
+export const initializeHand = (session, currentHand) => {
     // Logic to determine the number of cards to deal for the next hand
     let cardsToDeal = (currentHand * 2 - 1 <= session.gameState.maxCards)
         ? 2 * currentHand - 1  // First increasing phase
@@ -19,8 +19,6 @@ const initializeHand = (session, currentHand) => {
     });
 };
 
-const getRandomPlayer = (players) => {
+export const getRandomPlayer = (players) => {
     return players[Math.floor(Math.random() * players.length)];
 };
-
-export  {initializeHand, getRandomPlayer};

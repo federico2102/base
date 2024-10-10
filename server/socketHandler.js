@@ -1,5 +1,6 @@
-import { handleCreateGame, handleJoinGame, handleDeclarations, handleStartGame,
-    handleMaxCards, handlePlayCard, handlePlayerContinue, handleDestroySession } from './handlers/gameHandlers.js';
+import { handleDeclarations, handleStartGame,
+    handleMaxCards, handlePlayCard, handlePlayerContinue } from './handlers/gameHandlers.js';
+import { handleCreateGame, handleJoinGame, handleDestroySession } from './handlers/sessionHandlers.js';
 
 const socketHandler = (io) => {
     io.on('connection', (socket) => {

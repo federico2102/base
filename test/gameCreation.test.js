@@ -58,7 +58,7 @@ describe('Game Creation and Joining Tests', function() {
                 // Try joining with the same name as the first player
                 clientSocket.emit('joinGame', { playerName: 'Player0', code: sessionId });
                 clientSocket.on('error', (data) => {
-                    expect(data.message).to.equal('Player name already exists in the session.');
+                    expect(data.message).to.equal('Player name already exists.');
                     done();
                 });
             })
@@ -79,7 +79,7 @@ describe('Game Creation and Joining Tests', function() {
                 // Try joining after the game has started
                 clientSocket.emit('joinGame', { playerName: 'Player2', code: sessionId });
                 clientSocket.on('error', (data) => {
-                    expect(data.message).to.equal('Game has already started, you cannot join.');
+                    expect(data.message).to.equal('Game has already started.');
                     done();
                 });
             })

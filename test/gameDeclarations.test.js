@@ -178,7 +178,7 @@ describe('Declaration Phase Tests', function() {
 
                             socket.on('error', (errData) => {
                                 try {
-                                    expect(errData.message).to.equal('It\'s not your turn to declare!');
+                                    expect(errData.message).to.equal('It\'s not your turn!');
                                     errorsReceived++;
                                     if (declarationAttempted === 1 && errorsReceived === playerData.length - 1) {
                                         done(); // Finish when the correct player declares and others are rejected

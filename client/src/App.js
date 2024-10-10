@@ -25,16 +25,6 @@ const App = () => {
             setGameStarted(true);       // Set the game as started
         });
 
-        // Listen for 'nextHand' event and update resetKey to force re-render of GameScreen
-       /* socket.on('nextHand', ({ playerHand, turnName, currentHand }) => {
-            setPlayerHand(playerHand);  // Set the player's hand from the server
-            setTurnName(turnName);      // Set the current player's turn name from the server
-            setCurrentHand(currentHand);    // Set the current hand number
-
-            // Increment resetKey to force re-render of GameScreen
-            setResetKey(prevKey => prevKey + 1);
-        });*/
-
         return () => {
             socket.off('gameStarted');
             //socket.off('nextHand');

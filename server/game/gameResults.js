@@ -1,5 +1,5 @@
 // End of hand: Calculate scores based on the declarations and actual wins
-const calculateScores = (session, io) => {
+export const calculateScores = (session, io) => {
     if (!session) return;
 
     session.players.forEach(player => {
@@ -19,12 +19,11 @@ const calculateScores = (session, io) => {
 };
 
 // End of game logic: Show final scoreboard and determine the winner
-const endGame = (session, sessionId, io) => {
+export const endGame = (session, sessionId, io) => {
     if (!session) return;
 
     const winner = session.players.reduce((maxPlayer, player) =>
         player.score > maxPlayer.score ? player : maxPlayer, session.players[0]);
+
     io.to(sessionId).emit('gameOver', { winner: winner.name, scoreboard: session.gameState.scoreboard });
 };
-
-export { calculateScores, endGame };

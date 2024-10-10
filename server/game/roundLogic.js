@@ -3,7 +3,7 @@ const cardValues = {
     '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
 };
 
-const determineRoundWinner = (playedCards) => {
+export const determineRoundWinner = (playedCards) => {
     let highestCard = null;
     let winningPlayer = null;
 
@@ -16,7 +16,7 @@ const determineRoundWinner = (playedCards) => {
         if (
             isAceOfHearts ||  // Ace of Hearts is the highest priority
             !highestCard ||  // No highest card yet
-            cardValue >= cardValues[highestCard.rank]  // Current card is of higher rank
+            cardValue > cardValues[highestCard.rank]  // Current card is of higher rank
         ) {
             highestCard = { rank, suit, playerName };  // Update highest card
             winningPlayer = playerName;  // Update winner
@@ -25,5 +25,3 @@ const determineRoundWinner = (playedCards) => {
 
     return winningPlayer;
 };
-
-export {determineRoundWinner};
